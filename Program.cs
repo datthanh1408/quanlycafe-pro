@@ -8,14 +8,25 @@ using CoffeeShop.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
+var contentRoot = Directory.GetCurrentDirectory();
+var frontendWebRoot = Path.Combine(contentRoot, "Frontend", "wwwroot");
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
-    WebRootPath = "Frontend/wwwroot"
+    ContentRootPath = contentRoot,
+    WebRootPath = Directory.Exists(frontendWebRoot) ? frontendWebRoot : "Frontend/wwwroot"
 });
 
 // Cấu hình WebRoot và Razor View Engine cho cấu trúc 3 phần (Database - Backend - Frontend)
-builder.WebHost.UseWebRoot("Frontend/wwwroot");
+if (Directory.Exists(frontendWebRoot))
+{
+    builder.WebHost.UseWebRoot(frontendWebRoot);
+}
+else
+{
+    builder.WebHost.UseWebRoot("Frontend/wwwroot");
+}
 
 builder.Services.Configure<Microsoft.AspNetCore.Mvc.Razor.RazorViewEngineOptions>(options =>
 {
@@ -157,6 +168,15 @@ app.Use(async (context, next) =>
     await next();
 });
 
+var physicalWebRoot = Path.Combine(app.Environment.ContentRootPath, "Frontend", "wwwroot");
+if (Directory.Exists(physicalWebRoot))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(physicalWebRoot),
+        RequestPath = ""
+    });
+}
 app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
