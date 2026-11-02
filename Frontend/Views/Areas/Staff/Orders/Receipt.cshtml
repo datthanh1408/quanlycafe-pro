@@ -1,0 +1,214 @@
+@using CoffeeShop.Areas.Staff.Models
+@model StaffOrderReceiptVm
+@{
+    var o = Model.Order;
+    var s = Model.StoreSettings;
+    ViewData["Title"] = $"Hóa đơn {o.Code}";
+}
+
+@section Styles {
+    <style>
+        .receipt-paper {
+            max-width: 420px;
+            margin: 0 auto;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            padding: 24px 22px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+            color: #111827;
+            font-size: 0.92rem;
+        }
+        .receipt-divider {
+            border-top: 1.5px dashed #9CA3AF;
+            margin: 12px 0;
+        }
+        @@media print {
+            @@page {
+                margin: 6mm;
+            }
+            main.container-fluid {
+                padding: 0 !important;
+            }
+            .receipt-paper {
+                max-width: 100% !important;
+                width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+        }
+    </style>
+}
+
+<!-- Thanh công cụ điều khiển (Ẩn khi in @@media print) -->
+<div class="d-flex flex-wrap align-items-center justify-content-center gap-2 mb-4 no-print">
+    <button type="button" class="btn btn-coffee staff-touch-btn px-4 shadow-sm" onclick="window.print()">
+        <i class="bi bi-printer-fill"></i>
+        <span>In hóa đơn</span>
+    </button>
+    <a href="/staff/pos" class="btn btn-accent text-white staff-touch-btn px-4 shadow-sm">
+        <i class="bi bi-calculator-fill"></i>
+        <span>Quay lại POS</span>
+    </a>
+    <a href="/staff/orders/detail/@o.Id" class="btn btn-outline-coffee bg-white staff-touch-btn px-3">
+        <i class="bi bi-sliders"></i>
+        <span>Chi tiết đơn hàng</span>
+    </a>
+    <a href="/staff/orders" class="btn btn-outline-secondary bg-white staff-touch-btn px-3">
+        <i class="bi bi-list-ul"></i>
+        <span>Danh sách đơn</span>
+    </a>
+</div>
+
+<!-- Phiếu in hóa đơn chuẩn nhiệt 80mm / A5 -->
+<div class="receipt-paper">
+    <div class="text-center mb-2">
+        <div class="fw-bold fs-4 text-uppercase">@s.ShopName</div>
+        @if (!string.IsNullOrWhiteSpace(s.Slogan))
+        {
+            <div class="small text-muted fst-italic">@s.Slogan</div>
+        }
+        <div class="small mt-1">@s.Address</div>
+        <div class="small">Hotline: <strong>@s.Phone</strong></div>
+    </div>
+
+    <div class="receipt-divider"></div>
+
+    <div class="text-center mb-2">
+        <div class="fw-bold fs-5">PHIẾU THANH TOÁN</div>
+        <div class="fw-bold">Mã đơn: @o.Code</div>
+    </div>
+
+    <div class="small">
+        <div class="d-flex justify-content-between">
+            <span>Ngày giờ:</span>
+            <strong>@FormatHelper.DateTimeVn(o.CreatedAt, "dd/MM/yyyy HH:mm")</strong>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Hình thức:</span>
+            <strong>
+                @o.OrderType.GetDisplayName()
+                @if (o.Table != null)
+                {
+                    <span>(Bàn @o.Table.Code)</span>
+                }
+            </strong>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Khách hàng:</span>
+            <span>@o.CustomerName @(!string.IsNullOrWhiteSpace(o.Phone) ? $"({o.Phone})" : "")</span>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(o.DeliveryAddress))
+        {
+            <div class="mt-1">
+                <span>Giao đến:</span> <strong>@o.DeliveryAddress</strong>
+            </div>
+        }
+        <div class="d-flex justify-content-between">
+            <span>Thu ngân:</span>
+            <span>@Model.CashierName</span>
+        </div>
+    </div>
+
+    <div class="receipt-divider"></div>
+
+    <!-- Chi tiết từng dòng món & topping -->
+    <div>
+        @foreach (var item in o.Items)
+        {
+            var opts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(item.SizeName)) opts.Add($"Size {item.SizeName}");
+            if (!string.IsNullOrWhiteSpace(item.Temperature)) opts.Add(item.Temperature);
+            if (!string.IsNullOrWhiteSpace(item.SugarLevel)) opts.Add($"Đường {item.SugarLevel}");
+            if (!string.IsNullOrWhiteSpace(item.IceLevel)) opts.Add($"Đá {item.IceLevel}");
+
+            <div class="mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="fw-bold pe-2">@item.ProductName</div>
+                    <div class="fw-bold text-nowrap">@FormatHelper.Vnd(item.LineTotal)</div>
+                </div>
+                @if (opts.Count > 0)
+                {
+                    <div class="text-muted" style="font-size: 0.8rem;">@string.Join(" • ", opts)</div>
+                }
+                @if (item.Toppings.Count > 0)
+                {
+                    <div style="font-size: 0.8rem;">
+                        + @string.Join(", ", item.Toppings.Select(t => $"{t.ToppingName} ({FormatHelper.Vnd(t.Price)})"))
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(item.Note))
+                {
+                    <div class="fst-italic text-secondary" style="font-size: 0.78rem;">Ghi chú: @item.Note</div>
+                }
+                <div class="text-muted" style="font-size: 0.8rem;">
+                    @item.Quantity x @FormatHelper.Vnd(item.UnitPrice)
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(o.Note))
+    {
+        <div class="small fst-italic border-top pt-1 mt-1">
+            Ghi chú đơn: @o.Note
+        </div>
+    }
+
+    <div class="receipt-divider"></div>
+
+    <!-- Tổng hợp tài chính -->
+    <div class="small">
+        <div class="d-flex justify-content-between mb-1">
+            <span>Tạm tính (@o.Items.Sum(i => i.Quantity) món):</span>
+            <span>@FormatHelper.Vnd(o.Subtotal)</span>
+        </div>
+        @if (o.DiscountAmount > 0)
+        {
+            <div class="d-flex justify-content-between mb-1">
+                <span>Giảm giá @(o.Promotion != null ? $"({o.Promotion.Code})" : ""):</span>
+                <span>-@FormatHelper.Vnd(o.DiscountAmount)</span>
+            </div>
+        }
+        @if (o.ShippingFee > 0)
+        {
+            <div class="d-flex justify-content-between mb-1">
+                <span>Phí giao hàng:</span>
+                <span>@FormatHelper.Vnd(o.ShippingFee)</span>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center fw-bold fs-5 my-2">
+        <span>TỔNG CỘNG:</span>
+        <span>@FormatHelper.Vnd(o.Total)</span>
+    </div>
+
+    <div class="small d-flex justify-content-between">
+        <span>Phương thức TT:</span>
+        <strong>@o.PaymentMethod</strong>
+    </div>
+    <div class="small d-flex justify-content-between">
+        <span>Trạng thái TT:</span>
+        <strong>@o.PaymentStatus.GetDisplayName()</strong>
+    </div>
+
+    @if (string.Equals(o.PaymentMethod, "QR", StringComparison.OrdinalIgnoreCase) && s.IsQrConfigured && o.PaymentStatus == PaymentStatus.Unpaid)
+    {
+        <div class="text-center mt-3 pt-2 border-top">
+            <div class="small fw-semibold mb-1">Quét mã QR để thanh toán</div>
+            <img src="@s.QrImageUrl" alt="QR Thanh toán" style="max-width: 165px;" class="img-fluid rounded border p-1" />
+            <div class="small mt-1">@s.BankName – @s.BankAccountNumber</div>
+            <div class="small text-muted">@s.BankAccountHolder</div>
+        </div>
+    }
+
+    <div class="receipt-divider"></div>
+
+    <div class="text-center small text-muted">
+        <div class="fw-semibold text-dark">Cảm ơn Quý khách &amp; Hẹn gặp lại!</div>
+        <div>Giờ mở cửa: @s.OpeningHours</div>
+    </div>
+</div>

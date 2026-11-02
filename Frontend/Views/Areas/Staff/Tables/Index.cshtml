@@ -1,0 +1,377 @@
+@model StaffTablesVm
+@{
+    ViewData["Title"] = "Sơ đồ bàn 3D thời gian thực";
+    var selectedTable = Model.SelectedTableId.HasValue
+        ? Model.Tables.FirstOrDefault(t => t.Id == Model.SelectedTableId.Value)
+        : Model.Tables.FirstOrDefault();
+    var availableTargets = Model.Tables.Where(t => t.Status == TableStatus.Available).ToList();
+    var occupiedTargets = Model.Tables.Where(t => t.Status == TableStatus.Occupied).ToList();
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-box-fill text-coffee me-2"></i>Sơ đồ bàn 3D &amp; Điều phối tại quán
+        </h4>
+        <div class="small text-muted">
+            Chạm hoặc xoay không gian 3D để kiểm tra trạng thái bàn, mở POS, chuyển bàn hoặc gộp đơn theo thời gian thực.
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge rounded-pill px-3 py-2" style="background:#10B981;">
+            <i class="bi bi-check-circle me-1"></i>Trống: <strong id="countAvailable">@Model.AvailableCount</strong>
+        </span>
+        <span class="badge rounded-pill px-3 py-2 text-dark" style="background:#F59E0B;">
+            <i class="bi bi-cup-hot-fill me-1"></i>Đang phục vụ: <strong id="countOccupied">@Model.OccupiedCount</strong>
+        </span>
+        <span class="badge rounded-pill px-3 py-2" style="background:#3B82F6;">
+            <i class="bi bi-calendar-event me-1"></i>Đã đặt trước: <strong id="countReserved">@Model.ReservedCount</strong>
+        </span>
+        <a href="/staff/reservations" class="btn btn-outline-coffee staff-touch-btn btn-sm">
+            <i class="bi bi-calendar-check me-1"></i>Lịch đặt bàn
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Cột trái: Không gian Sơ đồ bàn 3D + Lưới 2D dự phòng -->
+    <div class="col-lg-8">
+        <div class="card card-coffee">
+            <div class="card-header bg-white border-bottom py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="btn-group" role="group" aria-label="Chọn khu vực camera 3D">
+                    <button type="button" class="btn btn-sm btn-coffee staff-touch-btn px-3" data-zone-focus="ALL">Toàn quán</button>
+                    <button type="button" class="btn btn-sm btn-outline-coffee staff-touch-btn px-3" data-zone-focus="Tầng 1">Tầng 1</button>
+                    <button type="button" class="btn btn-sm btn-outline-coffee staff-touch-btn px-3" data-zone-focus="Tầng 2">Tầng 2</button>
+                    <button type="button" class="btn btn-sm btn-outline-coffee staff-touch-btn px-3" data-zone-focus="Sân vườn">Sân vườn</button>
+                </div>
+
+                <div class="btn-group" role="group" aria-label="Chuyển chế độ 3D hoặc 2D">
+                    <button type="button" class="btn btn-sm btn-dark active" id="btnView3D">
+                        <i class="bi bi-badge-3d me-1"></i>3D WebGL
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-dark" id="btnView2D">
+                        <i class="bi bi-grid-3x3-gap me-1"></i>Lưới thẻ 2D
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body p-2">
+                <!-- Khung 3D Three.js -->
+                <div id="wrapFloor3D" class="position-relative">
+                    <div id="staffFloor3D" class="three-floorplan-stage rounded-3 overflow-hidden" style="height: 520px;"></div>
+                    <div id="staffFloorTooltip" class="three-tooltip"></div>
+                    <div class="position-absolute bottom-0 start-0 m-2 px-3 py-1 rounded-pill bg-dark bg-opacity-75 text-white small">
+                        <i class="bi bi-hand-index-thumb me-1"></i>Chạm bàn để thao tác • Kéo để xoay góc nhìn • Cuộn để thu phóng
+                    </div>
+                </div>
+
+                <!-- Khung Lưới 2D Cảm ứng nhanh -->
+                <div id="wrapFloor2D" style="display: none;" class="p-2">
+                    @foreach (var zoneGroup in Model.Tables.GroupBy(t => t.Zone))
+                    {
+                        <h6 class="fw-bold text-coffee mt-2 mb-2 border-bottom pb-1">
+                            <i class="bi bi-geo-alt-fill me-1"></i>@zoneGroup.Key
+                        </h6>
+                        <div class="row g-2 mb-3">
+                            @foreach (var t in zoneGroup)
+                            {
+                                var borderCol = t.Status == TableStatus.Available ? "#10B981"
+                                    : (t.Status == TableStatus.Occupied ? "#F59E0B" : "#3B82F6");
+                                <div class="col-6 col-md-4 col-xl-3">
+                                    <button type="button"
+                                            class="btn w-100 text-start p-3 rounded-3 bg-white shadow-sm table-card-2d"
+                                            data-table-id="@t.Id"
+                                            style="border: 2px solid @borderCol; min-height: 92px;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <strong class="fs-5 text-dark">@t.Code</strong>
+                                            <span class="badge" style="background:@borderCol;">@t.StatusText</span>
+                                        </div>
+                                        <div class="small text-muted">@t.Capacity khách • @t.Zone</div>
+                                        @if (!string.IsNullOrWhiteSpace(t.ActiveOrderCode))
+                                        {
+                                            <div class="small fw-semibold text-coffee mt-1">
+                                                <i class="bi bi-receipt me-1"></i>@t.ActiveOrderCode (@FormatHelper.Vnd(t.ActiveOrderTotal ?? 0))
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(t.UpcomingReservationInfo))
+                                        {
+                                            <div class="small text-primary mt-1">
+                                                <i class="bi bi-clock me-1"></i>@t.UpcomingReservationInfo
+                                            </div>
+                                        }
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột phải: Bảng điều hành bàn đang chọn -->
+    <div class="col-lg-4">
+        <div class="card card-coffee h-100">
+            <div class="card-header bg-coffee text-white py-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="small text-white-50 d-block">Bàn đang chọn</span>
+                        <h4 class="fw-bold mb-0" id="opTableCode">@(selectedTable?.Code ?? "Chưa chọn")</h4>
+                    </div>
+                    <span class="badge bg-light text-dark fs-6 px-3 py-2" id="opTableStatus">
+                        @(selectedTable?.StatusText ?? "---")
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-body d-flex flex-column gap-3">
+                <div class="p-3 rounded-3 bg-cream">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Khu vực:</span>
+                        <strong id="opTableZone">@(selectedTable?.Zone ?? "---")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Sức chứa:</span>
+                        <strong id="opTableCapacity">@(selectedTable != null ? $"{selectedTable.Capacity} khách" : "---")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">Tọa độ 3D:</span>
+                        <span class="font-monospace small" id="opTableCoords">
+                            @(selectedTable != null ? $"({selectedTable.PosX:0.0}, {selectedTable.PosY:0.0})" : "---")
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Khối thông tin đơn đang mở hoặc lịch đặt sắp tới -->
+                <div id="opActiveOrderBox" class="p-3 rounded-3 border border-warning bg-warning bg-opacity-10"
+                     style="display: @(selectedTable?.ActiveOrderId != null ? "block" : "none");">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-bold text-dark"><i class="bi bi-receipt-cutoff me-1"></i>Đơn đang phục vụ</span>
+                        <span class="badge bg-warning text-dark" id="opActiveOrderStatus">@selectedTable?.ActiveOrderStatus</span>
+                    </div>
+                    <div class="fs-5 fw-bold text-coffee" id="opActiveOrderCode">@selectedTable?.ActiveOrderCode</div>
+                    <div class="small text-muted mb-2">Tạm tính hiện tại: <strong id="opActiveOrderTotal">@FormatHelper.Vnd(selectedTable?.ActiveOrderTotal ?? 0)</strong></div>
+                    <div class="d-grid gap-2">
+                        <a id="opViewOrderBtn"
+                           href="@(selectedTable?.ActiveOrderId != null ? $"/staff/orders/detail/{selectedTable.ActiveOrderId}" : "#")"
+                           class="btn btn-sm btn-dark staff-touch-btn">
+                            <i class="bi bi-eye me-1"></i>Xem &amp; Thanh toán đơn bàn này
+                        </a>
+                    </div>
+                </div>
+
+                <div id="opReservationBox" class="p-3 rounded-3 border border-primary bg-primary bg-opacity-10"
+                     style="display: @(!string.IsNullOrWhiteSpace(selectedTable?.UpcomingReservationInfo) ? "block" : "none");">
+                    <div class="small fw-bold text-primary mb-1"><i class="bi bi-calendar2-check me-1"></i>Lịch đặt trước gần nhất</div>
+                    <div class="small" id="opReservationInfo">@selectedTable?.UpcomingReservationInfo</div>
+                </div>
+
+                <!-- Nút mở nhanh máy POS cho bàn đang chọn -->
+                <a id="opOpenPosBtn"
+                   href="@(selectedTable != null ? $"/staff/pos?tableId={selectedTable.Id}" : "/staff/pos")"
+                   class="btn btn-accent text-white fw-bold staff-touch-btn w-100">
+                    <i class="bi bi-calculator-fill me-2"></i>
+                    <span id="opOpenPosLabel">
+                        @(selectedTable?.ActiveOrderId != null ? $"Gọi thêm món cho bàn {selectedTable.Code}" : $"Mở đơn POS tại bàn {selectedTable?.Code}")
+                    </span>
+                </a>
+
+                <hr class="my-1" />
+
+                <!-- 1. Đổi trạng thái bàn trực tiếp -->
+                <form method="post" action="/staff/tables/change-status" class="border rounded-3 p-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tableId" id="formStatusTableId" value="@(selectedTable?.Id ?? 0)" />
+                    <label class="form-label fw-bold small mb-2">
+                        <i class="bi bi-arrow-repeat text-coffee me-1"></i>Cập nhật trạng thái bàn
+                    </label>
+                    <div class="input-group">
+                        <select name="newStatus" id="formNewStatus" class="form-select">
+                            <option value="@TableStatus.Available">Trống (Sẵn sàng đón khách)</option>
+                            <option value="@TableStatus.Occupied">Đang sử dụng</option>
+                            <option value="@TableStatus.Reserved">Đã đặt trước</option>
+                        </select>
+                        <button type="submit" class="btn btn-coffee staff-touch-btn px-3">Lưu</button>
+                    </div>
+                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                        Lưu ý: Bàn đang có đơn mở chưa hoàn tất không thể chuyển về "Trống".
+                    </small>
+                </form>
+
+                <!-- 2. Chuyển bàn (Bàn đang có khách -> Bàn trống) -->
+                <form method="post" action="/staff/tables/transfer" class="border rounded-3 p-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="fromTableId" id="formTransferFromId" value="@(selectedTable?.Id ?? 0)" />
+                    <label class="form-label fw-bold small mb-2">
+                        <i class="bi bi-arrow-left-right text-coffee me-1"></i>Chuyển sang bàn trống khác
+                    </label>
+                    <div class="input-group">
+                        <select name="toTableId" class="form-select" required>
+                            <option value="">-- Chọn bàn trống đích --</option>
+                            @foreach (var avail in availableTargets)
+                            {
+                                <option value="@avail.Id">@avail.Code (@avail.Zone • @avail.Capacity chỗ)</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-outline-coffee staff-touch-btn px-3">Chuyển</button>
+                    </div>
+                </form>
+
+                <!-- 3. Gộp bàn (Gộp đơn từ bàn đang chọn sang một bàn đang phục vụ khác) -->
+                <form method="post" action="/staff/tables/merge" class="border rounded-3 p-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="sourceTableId" id="formMergeSourceId" value="@(selectedTable?.Id ?? 0)" />
+                    <label class="form-label fw-bold small mb-2">
+                        <i class="bi bi-intersect text-coffee me-1"></i>Gộp đơn vào bàn đang phục vụ
+                    </label>
+                    <div class="input-group">
+                        <select name="targetTableId" class="form-select" required>
+                            <option value="">-- Chọn bàn đích cần gộp vào --</option>
+                            @foreach (var occ in occupiedTargets)
+                            {
+                                <option value="@occ.Id">@occ.Code (@occ.ActiveOrderCode • @occ.Zone)</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-outline-dark staff-touch-btn px-3">Gộp đơn</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initFloorPlan3D } from '/js/three-floorplan.js';
+
+        const fmtVnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + ' ₫';
+        let tablesData = @Html.Raw(Model.TablesJson);
+        const initialId = @(Model.SelectedTableId.HasValue ? Model.SelectedTableId.Value.ToString() : (selectedTable != null ? selectedTable.Id.ToString() : "null"));
+
+        function updateOperationPanel(tbl) {
+            if (!tbl) return;
+            document.getElementById('opTableCode').textContent = tbl.code;
+            document.getElementById('opTableStatus').textContent = tbl.statusText;
+            document.getElementById('opTableZone').textContent = tbl.zone;
+            document.getElementById('opTableCapacity').textContent = `${tbl.capacity} khách`;
+            document.getElementById('opTableCoords').textContent = `(${Number(tbl.posX || 0).toFixed(1)}, ${Number(tbl.posY || 0).toFixed(1)})`;
+
+            document.getElementById('formStatusTableId').value = tbl.id;
+            document.getElementById('formTransferFromId').value = tbl.id;
+            document.getElementById('formMergeSourceId').value = tbl.id;
+
+            const statusNames = ['Available', 'Occupied', 'Reserved'];
+            const statusSelect = document.getElementById('formNewStatus');
+            if (statusSelect && statusNames[tbl.status]) {
+                statusSelect.value = statusNames[tbl.status];
+            }
+
+            const activeBox = document.getElementById('opActiveOrderBox');
+            const posBtn = document.getElementById('opOpenPosBtn');
+            const posLabel = document.getElementById('opOpenPosLabel');
+            posBtn.href = `/staff/pos?tableId=${tbl.id}`;
+
+            if (tbl.activeOrderId) {
+                activeBox.style.display = 'block';
+                document.getElementById('opActiveOrderCode').textContent = tbl.activeOrderCode || '';
+                document.getElementById('opActiveOrderStatus').textContent = tbl.activeOrderStatus || '';
+                document.getElementById('opActiveOrderTotal').textContent = fmtVnd(tbl.activeOrderTotal || 0);
+                document.getElementById('opViewOrderBtn').href = `/staff/orders/detail/${tbl.activeOrderId}`;
+                posLabel.textContent = `Gọi thêm món cho bàn ${tbl.code}`;
+            } else {
+                activeBox.style.display = 'none';
+                posLabel.textContent = `Mở đơn POS tại bàn ${tbl.code}`;
+            }
+
+            const resBox = document.getElementById('opReservationBox');
+            if (tbl.upcomingReservationInfo) {
+                resBox.style.display = 'block';
+                document.getElementById('opReservationInfo').textContent = tbl.upcomingReservationInfo;
+            } else {
+                resBox.style.display = 'none';
+            }
+        }
+
+        const floorCtrl = initFloorPlan3D({
+            containerId: 'staffFloor3D',
+            tooltipId: 'staffFloorTooltip',
+            tables: tablesData,
+            editable: false,
+            initialSelectedId: initialId,
+            onSelectTable: (tbl) => updateOperationPanel(tbl)
+        });
+
+        // Điều hướng góc quay khu vực 3D
+        document.querySelectorAll('[data-zone-focus]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-zone-focus]').forEach(b => {
+                    b.classList.remove('btn-coffee');
+                    b.classList.add('btn-outline-coffee');
+                });
+                btn.classList.remove('btn-outline-coffee');
+                btn.classList.add('btn-coffee');
+                floorCtrl?.focusZone(btn.dataset.zoneFocus);
+            });
+        });
+
+        // Chuyển đổi 3D WebGL <-> Lưới thẻ 2D
+        const btn3D = document.getElementById('btnView3D');
+        const btn2D = document.getElementById('btnView2D');
+        const wrap3D = document.getElementById('wrapFloor3D');
+        const wrap2D = document.getElementById('wrapFloor2D');
+
+        btn3D?.addEventListener('click', () => {
+            btn3D.classList.add('btn-dark', 'active');
+            btn3D.classList.remove('btn-outline-dark');
+            btn2D.classList.remove('btn-dark', 'active');
+            btn2D.classList.add('btn-outline-dark');
+            wrap3D.style.display = 'block';
+            wrap2D.style.display = 'none';
+            window.dispatchEvent(new Event('resize'));
+        });
+
+        btn2D?.addEventListener('click', () => {
+            btn2D.classList.add('btn-dark', 'active');
+            btn2D.classList.remove('btn-outline-dark');
+            btn3D.classList.remove('btn-dark', 'active');
+            btn3D.classList.add('btn-outline-dark');
+            wrap3D.style.display = 'none';
+            wrap2D.style.display = 'block';
+        });
+
+        document.querySelectorAll('.table-card-2d').forEach(card => {
+            card.addEventListener('click', () => {
+                const tid = parseInt(card.dataset.tableId, 10);
+                const found = tablesData.find(x => x.id === tid);
+                if (found) {
+                    floorCtrl?.selectTable(found.id);
+                    updateOperationPanel(found);
+                }
+            });
+        });
+
+        // Đồng bộ SignalR thời gian thực khi có đơn mới hoặc bàn đổi trạng thái
+        async function refreshFloorFromApi() {
+            try {
+                const res = await fetch('/api/tables/3d');
+                if (!res.ok) return;
+                const latest = await res.json();
+                tablesData = latest;
+                floorCtrl?.setTables(latest);
+
+                document.getElementById('countAvailable').textContent = latest.filter(x => x.status === 0).length;
+                document.getElementById('countOccupied').textContent = latest.filter(x => x.status === 1).length;
+                document.getElementById('countReserved').textContent = latest.filter(x => x.status === 2).length;
+
+                const currId = parseInt(document.getElementById('formStatusTableId').value || '0', 10);
+                const currTbl = latest.find(x => x.id === currId);
+                if (currTbl) updateOperationPanel(currTbl);
+            } catch { }
+        }
+
+        window.DatMocRealtime?.onTableChanged(() => refreshFloorFromApi());
+        window.DatMocRealtime?.onOrderChanged(() => refreshFloorFromApi());
+    </script>
+}
+

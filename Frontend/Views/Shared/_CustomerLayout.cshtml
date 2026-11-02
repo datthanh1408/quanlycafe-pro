@@ -1,0 +1,226 @@
+@inject ISettingService SettingService
+@inject ICartService CartService
+@{
+    var store = await SettingService.GetStoreSettingsAsync();
+    var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var cart = await CartService.GetCartSummaryAsync(userId);
+    var currentPath = Context.Request.Path.Value ?? "/";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] != null ? $"{ViewData["Title"]} – {store.ShopName}" : store.ShopName)</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        :root {
+            --brand-primary: @store.PrimaryColor;
+            --brand-secondary: @store.SecondaryColor;
+            --brand-accent: @store.AccentColor;
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body data-watch-order-code="@(ViewData["WatchOrderCode"] ?? "")">
+    <partial name="_ToastPartial" />
+
+    <!-- Header Khu vực Customer -->
+    <header class="customer-navbar sticky-top">
+        <nav class="navbar navbar-expand-lg py-2">
+            <div class="container">
+                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-coffee" href="/">
+                    @if (!string.IsNullOrWhiteSpace(store.LogoUrl))
+                    {
+                        <img src="@store.LogoUrl" alt="@store.ShopName" style="height: 38px; width: auto;" class="rounded" />
+                    }
+                    else
+                    {
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-3 bg-coffee text-white" style="width: 38px; height: 38px;">
+                            <i class="bi bi-cup-hot-fill"></i>
+                        </span>
+                    }
+                    <div>
+                        <span class="font-display fs-5 d-block lh-1">@store.ShopName</span>
+                        <small class="text-muted fw-normal" style="font-size: 0.72rem;">3D Specialty Coffee &amp; Bakery</small>
+                    </div>
+                </a>
+
+                <div class="d-flex align-items-center gap-2 d-lg-none">
+                    <a href="/cart" class="btn btn-outline-coffee position-relative px-3" aria-label="Giỏ hàng">
+                        <i class="bi bi-bag-heart-fill"></i>
+                        @if (cart.TotalQuantity > 0)
+                        {
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" data-cart-badge>
+                                @cart.TotalQuantity
+                            </span>
+                        }
+                    </a>
+                    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#customerNav" aria-label="Mở menu">
+                        <i class="bi bi-list fs-2 text-coffee"></i>
+                    </button>
+                </div>
+
+                <div class="collapse navbar-collapse" id="customerNav">
+                    <ul class="navbar-nav mx-auto mb-2 mb-lg-0 gap-lg-1">
+                        <li class="nav-item">
+                            <a class="nav-link fw-semibold @(currentPath == "/" ? "text-coffee" : "")" href="/">Trang chủ 3D</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link fw-semibold @(currentPath.StartsWith("/menu") || currentPath.StartsWith("/product") ? "text-coffee" : "")" href="/menu">Thực đơn</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link fw-semibold @(currentPath.StartsWith("/reservation") ? "text-coffee" : "")" href="/reservation">Đặt bàn 3D</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link fw-semibold @(currentPath.StartsWith("/about") ? "text-coffee" : "")" href="/about">Giới thiệu</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link fw-semibold @(currentPath.StartsWith("/contact") ? "text-coffee" : "")" href="/contact">Liên hệ</a>
+                        </li>
+                    </ul>
+
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        @if (User.IsInRole(AppRoles.Admin))
+                        {
+                            <a href="/admin/dashboard" class="btn btn-sm btn-dark px-3">
+                                <i class="bi bi-speedometer2 me-1"></i> Quản trị Admin
+                            </a>
+                        }
+                        else if (User.IsInRole(AppRoles.Staff))
+                        {
+                            <a href="/staff/dashboard" class="btn btn-sm btn-dark px-3">
+                                <i class="bi bi-shop me-1"></i> Quầy Nhân viên
+                            </a>
+                        }
+
+                        <a href="/cart" class="btn btn-outline-coffee position-relative d-none d-lg-inline-flex px-3">
+                            <i class="bi bi-bag-heart-fill me-2"></i> Giỏ hàng
+                            <span class="badge rounded-pill bg-accent text-white ms-2" style="background: var(--brand-accent);" data-cart-badge>
+                                @cart.TotalQuantity
+                            </span>
+                        </a>
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="dropdown">
+                                <button class="btn btn-coffee dropdown-toggle px-3" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-person-circle me-1"></i> Tài khoản
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3">
+                                    @if (User.IsInRole(AppRoles.Customer))
+                                    {
+                                        <li><a class="dropdown-item py-2" href="/orders"><i class="bi bi-receipt me-2"></i>Theo dõi đơn của tôi</a></li>
+                                        <li><a class="dropdown-item py-2" href="/account"><i class="bi bi-person-gear me-2"></i>Hồ sơ &amp; Điểm thưởng</a></li>
+                                    }
+                                    <li><a class="dropdown-item py-2" href="/account/change-password"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li>
+                                        <form method="post" action="/logout">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item py-2 text-danger">
+                                                <i class="bi bi-box-arrow-right me-2"></i>Đăng xuất
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        }
+                        else
+                        {
+                            <a href="/login" class="btn btn-coffee px-3">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Đăng nhập
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="pb-5">
+        @RenderBody()
+    </main>
+
+    <!-- Thanh giỏ hàng cố định trên Mobile khi có món (Mục 12) -->
+    @if (cart.TotalQuantity > 0 && !currentPath.StartsWith("/cart") && !currentPath.StartsWith("/checkout"))
+    {
+        <div class="mobile-sticky-cart d-lg-none">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="badge bg-warning text-dark me-1">@cart.TotalQuantity món</span>
+                    <strong class="fs-6">@FormatHelper.Vnd(cart.Total)</strong>
+                </div>
+                <a href="/cart" class="btn btn-accent btn-sm px-3">
+                    Xem giỏ &amp; Đặt món <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    }
+
+    <!-- Footer (Mục 1 & 7.1: tự ẩn MXH khi chưa cấu hình link) -->
+    <footer class="bg-dark text-light pt-5 pb-4 mt-5 no-print" style="background-color: var(--surface-dark) !important;">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <h5 class="font-display fw-bold text-white mb-2">
+                        <i class="bi bi-cup-hot-fill text-warning me-2"></i>@store.ShopName
+                    </h5>
+                    <p class="text-white-50 mb-2">@store.Slogan</p>
+                    <p class="small text-white-50 mb-0">
+                        Loại hình: @store.BusinessType • Không gian trải nghiệm 3D trực quan với công nghệ Three.js WebGL.
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="fw-bold text-uppercase small text-warning mb-3">Thông tin liên hệ</h6>
+                    <ul class="list-unstyled small text-white-50 d-grid gap-2">
+                        <li><i class="bi bi-geo-alt-fill text-warning me-2"></i>@store.Address</li>
+                        <li><i class="bi bi-telephone-fill text-warning me-2"></i>@store.Phone</li>
+                        <li><i class="bi bi-envelope-fill text-warning me-2"></i>@store.Email</li>
+                        <li><i class="bi bi-clock-fill text-warning me-2"></i>Giờ mở cửa: @store.OpeningHours</li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="fw-bold text-uppercase small text-warning mb-3">Khám phá nhanh</h6>
+                    <ul class="list-unstyled small d-grid gap-2">
+                        <li><a href="/menu" class="text-white-50 text-decoration-none">Thực đơn đồ uống &amp; bánh</a></li>
+                        <li><a href="/reservation" class="text-white-50 text-decoration-none">Đặt bàn trước trên sơ đồ 3D</a></li>
+                        <li><a href="/orders" class="text-white-50 text-decoration-none">Tra cứu tiến trình đơn hàng</a></li>
+                    </ul>
+                    @if (!string.IsNullOrWhiteSpace(store.FacebookUrl) || !string.IsNullOrWhiteSpace(store.ZaloUrl))
+                    {
+                        <div class="d-flex gap-2 mt-3">
+                            @if (!string.IsNullOrWhiteSpace(store.FacebookUrl))
+                            {
+                                <a href="@store.FacebookUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-facebook me-1"></i> Facebook
+                                </a>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(store.ZaloUrl))
+                            {
+                                <a href="@store.ZaloUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-chat-dots-fill me-1"></i> Zalo
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+            <hr class="border-secondary my-4" />
+            <div class="d-flex flex-wrap justify-content-between small text-white-50">
+                <span>&copy; @DateTime.Now.Year @store.ShopName. All rights reserved.</span>
+                <span>VND • Giờ Việt Nam (UTC+7)</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script src="~/js/realtime-hub.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+

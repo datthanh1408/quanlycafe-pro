@@ -1,0 +1,125 @@
+@using CoffeeShop.Areas.Admin.Models
+@model CustomersAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Khách hàng";
+    var currentUrl = Context.Request.Path + Context.Request.QueryString;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-people-fill me-2"></i>Danh sách Khách hàng Thành viên</h4>
+        <div class="text-muted small">Tra cứu hồ sơ khách hàng, điểm thưởng tích lũy và tổng chi tiêu thực tế (chỉ tính đơn Hoàn thành &amp; Đã thanh toán).</div>
+    </div>
+</div>
+
+<!-- Bộ lọc & sắp xếp Server-side -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" action="/admin/customers" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label small fw-semibold mb-1">Tìm theo Họ tên, Email hoặc Số điện thoại</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" value="@Model.Search" placeholder="Nhập tên khách hàng, email hoặc SĐT..." />
+                </div>
+            </div>
+            <div class="col-8 col-md-4">
+                <label class="form-label small fw-semibold mb-1">Sắp xếp theo</label>
+                <select name="sort" class="form-select">
+                    <option value="newest" selected="@(Model.Sort == "newest")">Đăng ký mới nhất</option>
+                    <option value="spend_desc" selected="@(Model.Sort == "spend_desc")">Chi tiêu tích lũy cao nhất</option>
+                    <option value="orders_desc" selected="@(Model.Sort == "orders_desc")">Số đơn hoàn thành nhiều nhất</option>
+                </select>
+            </div>
+            <div class="col-4 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-coffee flex-grow-1" style="min-height: 38px;">Lọc</button>
+                <a href="/admin/customers" class="btn btn-light border" style="min-height: 38px;" title="Đặt lại">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Tổng số: @Model.PagedCustomers.TotalItems khách hàng</span>
+        <span class="small text-muted">Trang @Model.PagedCustomers.Page / @Model.PagedCustomers.TotalPages</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Khách hàng</th>
+                    <th>Liên hệ</th>
+                    <th class="text-center">Đơn hoàn thành</th>
+                    <th class="text-end">Tổng chi tiêu</th>
+                    <th class="text-center">Điểm tích lũy</th>
+                    <th class="text-center">Trạng thái</th>
+                    <th class="text-end pe-3">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.PagedCustomers.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">Không tìm thấy khách hàng nào.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var c in Model.PagedCustomers.Items)
+                    {
+                        <tr>
+                            <td class="ps-3">
+                                <a href="/admin/customers/detail/@c.Id" class="fw-bold text-coffee text-decoration-none">@c.FullName</a>
+                                <div class="small text-muted">Tham gia: @FormatHelper.DateTimeVn(c.CreatedAt, "dd/MM/yyyy")</div>
+                            </td>
+                            <td class="small">
+                                <div>@c.Email</div>
+                                <div class="text-muted">@(string.IsNullOrWhiteSpace(c.Phone) ? "-" : c.Phone)</div>
+                            </td>
+                            <td class="text-center fw-semibold">@c.CompletedOrderCount đơn</td>
+                            <td class="text-end fw-bold text-coffee">@FormatHelper.Vnd(c.TotalSpend)</td>
+                            <td class="text-center">
+                                <span class="badge rounded-pill bg-warning text-dark px-3 py-2">
+                                    <i class="bi bi-award-fill me-1"></i>@c.LoyaltyPoints điểm
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                @if (c.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Hoạt động</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Đã khóa</span>
+                                }
+                            </td>
+                            <td class="text-end pe-3">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/admin/customers/detail/@c.Id" class="btn btn-sm btn-outline-coffee" style="min-height: 34px;">
+                                        <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
+                                    </a>
+                                    <form method="post" action="/admin/customers/toggle-lock" class="d-inline"
+                                          onsubmit="return confirm('Xác nhận @(c.IsActive ? "khóa" : "mở khóa") tài khoản khách hàng &quot;@c.FullName&quot;?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" value="@c.Id" />
+                                        <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                        <button type="submit" class="btn btn-sm btn-light border @(c.IsActive ? "text-danger" : "text-success")"
+                                                title="@(c.IsActive ? "Khóa tài khoản" : "Mở khóa tài khoản")">
+                                            <i class="bi @(c.IsActive ? "bi-lock-fill" : "bi-unlock-fill")"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-0 pb-3">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.PagedCustomers.Page, Model.PagedCustomers.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>

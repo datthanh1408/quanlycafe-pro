@@ -1,0 +1,189 @@
+@using CoffeeShop.Areas.Admin.Models
+@model ProductsAdminViewModel
+@{
+    ViewData["Title"] = "Sản phẩm & Công thức";
+    var currentUrl = Context.Request.Path + Context.Request.QueryString;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-cup-straw me-2"></i>Sản phẩm &amp; Công thức Định lượng</h4>
+        <div class="text-muted small">Quản lý thực đơn, màu sắc ly 3D Three.js, biến thể Size S/M/L và định lượng trừ kho tự động.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/admin/categories" class="btn btn-outline-secondary btn-sm bg-white" style="min-height: 40px;">
+            <i class="bi bi-tags me-1"></i>Danh mục
+        </a>
+        <a href="/admin/toppings" class="btn btn-outline-secondary btn-sm bg-white" style="min-height: 40px;">
+            <i class="bi bi-plus-circle-dotted me-1"></i>Topping
+        </a>
+        <a href="/admin/products/create" class="btn btn-coffee px-3" style="min-height: 40px;">
+            <i class="bi bi-plus-lg me-1"></i>Thêm Sản phẩm mới
+        </a>
+    </div>
+</div>
+
+<!-- Thanh tìm kiếm & lọc Server-side -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" action="/admin/products" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label class="form-label small fw-semibold mb-1">Tìm kiếm sản phẩm</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" value="@Model.Search" placeholder="Nhập tên đồ uống, bánh ngọt hoặc mô tả..." />
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold mb-1">Danh mục</label>
+                <select name="categoryId" class="form-select">
+                    <option value="">-- Tất cả danh mục --</option>
+                    @foreach (var cat in Model.Categories)
+                    {
+                        <option value="@cat.Id" selected="@(Model.CategoryId == cat.Id)">@cat.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Trạng thái bán</label>
+                <select name="isAvailable" class="form-select">
+                    <option value="">-- Tất cả --</option>
+                    <option value="true" selected="@(Model.IsAvailable == true)">Đang kinh doanh</option>
+                    <option value="false" selected="@(Model.IsAvailable == false)">Tạm hết</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-coffee flex-grow-1" style="min-height: 38px;">
+                    <i class="bi bi-funnel me-1"></i>Lọc
+                </button>
+                <a href="/admin/products" class="btn btn-light border" style="min-height: 38px;" title="Đặt lại">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bảng danh sách sản phẩm -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Tổng số: @Model.PagedProducts.TotalItems sản phẩm</span>
+        <span class="small text-muted">Trang @Model.PagedProducts.Page / @Model.PagedProducts.TotalPages</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Sản phẩm</th>
+                    <th>Danh mục</th>
+                    <th>Giá &amp; Các Size</th>
+                    <th>Công thức kho</th>
+                    <th class="text-center">Màu 3D</th>
+                    <th class="text-center">Trạng thái</th>
+                    <th class="text-end pe-3">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.PagedProducts.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            Không tìm thấy sản phẩm phù hợp với điều kiện lọc.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in Model.PagedProducts.Items)
+                    {
+                        var hasRecipe = p.Recipes != null && p.Recipes.Any();
+                        <tr>
+                            <td class="ps-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <img src="@p.ImageUrl" alt="@p.Name" class="rounded-3 border bg-cream" style="width: 52px; height: 52px; object-fit: cover;" />
+                                    <div>
+                                        <div class="fw-bold d-flex align-items-center gap-1">
+                                            @p.Name
+                                            @if (p.IsFeatured)
+                                            {
+                                                <span class="badge bg-warning text-dark" title="Món nổi bật"><i class="bi bi-star-fill"></i></span>
+                                            }
+                                        </div>
+                                        <div class="small text-muted">Đã bán: <strong>@p.SoldCount</strong></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-cream text-coffee border">@(p.Category?.Name ?? "-")</span>
+                            </td>
+                            <td>
+                                <div class="fw-bold text-coffee">@FormatHelper.Vnd(p.BasePrice)</div>
+                                @if (p.Sizes != null && p.Sizes.Any())
+                                {
+                                    <div class="small text-muted">
+                                        @string.Join(" • ", p.Sizes.OrderBy(s => s.DisplayOrder).Select(s => $"{s.SizeName}: {FormatHelper.Vnd(s.Price)}"))
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @if (hasRecipe)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-check2-all me-1"></i>@(p.Recipes!.Count) dòng định lượng
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Chưa có công thức
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <span class="d-inline-block rounded-circle border shadow-sm"
+                                      style="width: 24px; height: 24px; background-color: @p.LiquidColorHex;"
+                                      title="Màu chất lỏng 3D: @p.LiquidColorHex"></span>
+                            </td>
+                            <td class="text-center">
+                                <form method="post" action="/admin/products/toggle/@p.Id" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                    @if (p.IsAvailable)
+                                    {
+                                        <button type="submit" class="badge rounded-pill bg-success border-0 px-3 py-2" style="cursor:pointer;" title="Nhấn để chuyển sang Tạm hết">
+                                            <i class="bi bi-check-circle me-1"></i>Kinh doanh
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="submit" class="badge rounded-pill bg-danger border-0 px-3 py-2" style="cursor:pointer;" title="Nhấn để Mở bán lại">
+                                            <i class="bi bi-slash-circle me-1"></i>Tạm hết
+                                        </button>
+                                    }
+                                </form>
+                            </td>
+                            <td class="text-end pe-3">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/admin/products/edit/@p.Id" class="btn btn-sm btn-light border" title="Sửa món & công thức">
+                                        <i class="bi bi-pencil-square text-coffee"></i> Sửa
+                                    </a>
+                                    <form method="post" action="/admin/products/delete/@p.Id" class="d-inline"
+                                          onsubmit="return confirm('Xác nhận xóa / lưu trữ ẩn món &quot;@p.Name&quot;?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger" title="Xóa mềm sản phẩm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-0 pb-3">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.PagedProducts.Page, Model.PagedProducts.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>

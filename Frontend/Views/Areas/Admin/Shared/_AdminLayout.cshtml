@@ -1,0 +1,180 @@
+@inject ISettingService SettingService
+@inject CoffeeShop.Data.AppDbContext DbContext
+@{
+    var store = await SettingService.GetStoreSettingsAsync();
+    var path = Context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    var pendingCount = DbContext.Orders.Count(o => o.Status == OrderStatus.Pending);
+    var lowStockCount = DbContext.Ingredients.Count(i => !i.IsDeleted && i.IsActive && i.StockQty <= i.MinThreshold);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] ?? "Quản trị") – Admin @store.ShopName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        :root {
+            --brand-primary: @store.PrimaryColor;
+            --brand-secondary: @store.SecondaryColor;
+            --brand-accent: @store.AccentColor;
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <partial name="~/Frontend/Views/Shared/_ToastPartial.cshtml" />
+
+    <div class="admin-wrapper" id="adminWrapper">
+        <!-- Sidebar Điều hướng thu gọn được (Mục 7.3 & 12) -->
+        <aside class="admin-sidebar no-print">
+            <div class="p-3 d-flex align-items-center justify-content-between border-bottom border-secondary border-opacity-25">
+                <a href="/admin/dashboard" class="text-white text-decoration-none d-flex align-items-center gap-2">
+                    <span class="rounded-3 bg-coffee d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                        <i class="bi bi-cup-hot-fill"></i>
+                    </span>
+                    <div class="brand-text">
+                        <strong class="d-block lh-1">@store.ShopName</strong>
+                        <small class="text-warning" style="font-size: 0.7rem;">ADMINISTRATION</small>
+                    </div>
+                </a>
+                <button type="button" class="btn btn-sm btn-dark d-lg-none" id="btnCloseMobileSidebar" aria-label="Đóng menu">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <nav class="py-2 flex-grow-1 overflow-auto">
+                <a href="/admin/dashboard" class="admin-nav-link @(path.Contains("/admin/dashboard") ? "active" : "")">
+                    <i class="bi bi-speedometer2 fs-5"></i> <span class="nav-label">Dashboard Tổng quan</span>
+                </a>
+                <a href="/admin/orders" class="admin-nav-link @(path.Contains("/admin/orders") ? "active" : "")">
+                    <i class="bi bi-receipt-cutoff fs-5"></i>
+                    <span class="nav-label flex-grow-1">Đơn hàng</span>
+                    <span class="badge rounded-pill bg-warning text-dark nav-label" data-staff-pending-badge style="display: @(pendingCount > 0 ? "inline-block" : "none")">@pendingCount</span>
+                </a>
+                <a href="/admin/tables" class="admin-nav-link @(path.Contains("/admin/tables") ? "active" : "")">
+                    <i class="bi bi-box-fill fs-5"></i> <span class="nav-label">Sơ đồ Bàn 3D</span>
+                </a>
+                <a href="/admin/products" class="admin-nav-link @(path.Contains("/admin/products") ? "active" : "")">
+                    <i class="bi bi-cup-straw fs-5"></i> <span class="nav-label">Sản phẩm &amp; Công thức</span>
+                </a>
+                <a href="/admin/categories" class="admin-nav-link @(path.Contains("/admin/categories") ? "active" : "")">
+                    <i class="bi bi-tags-fill fs-5"></i> <span class="nav-label">Danh mục</span>
+                </a>
+                <a href="/admin/toppings" class="admin-nav-link @(path.Contains("/admin/toppings") ? "active" : "")">
+                    <i class="bi bi-plus-circle-dotted fs-5"></i> <span class="nav-label">Topping</span>
+                </a>
+                <a href="/admin/inventory" class="admin-nav-link @(path.Contains("/admin/inventory") ? "active" : "")">
+                    <i class="bi bi-boxes fs-5"></i>
+                    <span class="nav-label flex-grow-1">Kho nguyên liệu</span>
+                    @if (lowStockCount > 0)
+                    {
+                        <span class="badge rounded-pill bg-danger nav-label">@lowStockCount</span>
+                    }
+                </a>
+                <a href="/admin/promotions" class="admin-nav-link @(path.Contains("/admin/promotions") ? "active" : "")">
+                    <i class="bi bi-ticket-perforated-fill fs-5"></i> <span class="nav-label">Khuyến mãi</span>
+                </a>
+                <a href="/admin/employees" class="admin-nav-link @(path.Contains("/admin/employees") ? "active" : "")">
+                    <i class="bi bi-person-Vcard-fill bi-person-badge-fill fs-5"></i> <span class="nav-label">Nhân viên &amp; Quyền</span>
+                </a>
+                <a href="/admin/customers" class="admin-nav-link @(path.Contains("/admin/customers") ? "active" : "")">
+                    <i class="bi bi-people-fill fs-5"></i> <span class="nav-label">Khách hàng</span>
+                </a>
+                <a href="/admin/reports" class="admin-nav-link @(path.Contains("/admin/reports") ? "active" : "")">
+                    <i class="bi bi-bar-chart-line-fill fs-5"></i> <span class="nav-label">Báo cáo &amp; Excel</span>
+                </a>
+                <a href="/admin/audit-logs" class="admin-nav-link @(path.Contains("/admin/audit-logs") ? "active" : "")">
+                    <i class="bi bi-journal-code fs-5"></i> <span class="nav-label">Nhật ký hoạt động</span>
+                </a>
+                <a href="/admin/settings" class="admin-nav-link @(path.Contains("/admin/settings") ? "active" : "")">
+                    <i class="bi bi-sliders fs-5"></i> <span class="nav-label">Cài đặt hệ thống</span>
+                </a>
+            </nav>
+
+            <div class="p-3 border-top border-secondary border-opacity-25 d-grid gap-2">
+                <a href="/staff/pos" class="btn btn-sm btn-accent text-white">
+                    <i class="bi bi-calculator"></i> <span class="nav-label ms-1">Mở Quầy POS</span>
+                </a>
+                <a href="/" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-globe2"></i> <span class="nav-label ms-1">Trang Khách 3D</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="admin-main">
+            <!-- Topbar kèm Breadcrumb -->
+            <header class="bg-white border-bottom px-3 px-md-4 py-2 d-flex align-items-center justify-content-between sticky-top no-print">
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-light border btn-sm" id="btnToggleSidebar" aria-label="Thu gọn hoặc mở sidebar">
+                        <i class="bi bi-layout-sidebar-inset fs-5"></i>
+                    </button>
+                    <nav aria-label="breadcrumb" class="ms-2">
+                        <ol class="breadcrumb mb-0 small">
+                            <li class="breadcrumb-item"><a href="/admin/dashboard" class="text-decoration-none text-coffee">Quản trị</a></li>
+                            <li class="breadcrumb-item active fw-semibold" aria-current="page">@(ViewData["Title"] ?? "Tổng quan")</li>
+                        </ol>
+                    </nav>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (lowStockCount > 0)
+                    {
+                        <a href="/admin/inventory?lowStockOnly=true" class="badge bg-danger text-white text-decoration-none py-2 px-3 d-none d-md-inline-flex align-items-center gap-1">
+                            <i class="bi bi-exclamation-triangle-fill"></i> @lowStockCount NL sắp hết
+                        </a>
+                    }
+                    <div class="dropdown">
+                        <button class="btn btn-light border btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-check-fill text-coffee me-1"></i> @User.Identity?.Name
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                            <li><a class="dropdown-item" href="/account/change-password"><i class="bi bi-key me-2"></i>Đổi mật khẩu</a></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                <form method="post" action="/logout">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Đăng xuất</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <main class="p-3 p-md-4 flex-grow-1">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script src="~/js/realtime-hub.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            const wrapper = document.getElementById('adminWrapper');
+            const btnToggle = document.getElementById('btnToggleSidebar');
+            const btnCloseMobile = document.getElementById('btnCloseMobileSidebar');
+            if (localStorage.getItem('adminSidebarCollapsed') === '1' && window.innerWidth >= 992) {
+                wrapper.classList.add('sidebar-collapsed');
+            }
+            btnToggle?.addEventListener('click', () => {
+                if (window.innerWidth < 992) {
+                    wrapper.classList.toggle('mobile-sidebar-open');
+                } else {
+                    wrapper.classList.toggle('sidebar-collapsed');
+                    localStorage.setItem('adminSidebarCollapsed', wrapper.classList.contains('sidebar-collapsed') ? '1' : '0');
+                }
+            });
+            btnCloseMobile?.addEventListener('click', () => wrapper.classList.remove('mobile-sidebar-open'));
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+

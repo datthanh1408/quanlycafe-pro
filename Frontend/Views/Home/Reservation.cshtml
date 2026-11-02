@@ -1,0 +1,110 @@
+@model ReservationCreateVm
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Đặt bàn trước trên Sơ đồ 3D";
+    var tablesList = ViewBag.Tables3D as List<Table3DDto> ?? new List<Table3DDto>();
+    var tablesJson = JsonSerializer.Serialize(tablesList, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="container py-4 py-lg-5">
+    <div class="mb-4">
+        <span class="text-accent fw-bold small text-uppercase"><i class="bi bi-badge-3d-fill me-1"></i>Đặt chỗ trực quan</span>
+        <h1 class="h3 fw-bold font-display mb-1">Chọn bàn yêu thích trên Không gian 3D</h1>
+        <p class="text-muted small mb-0">Bấm trực tiếp vào bàn trên mô hình 3D (Tầng 1, Tầng 2 hoặc Sân vườn) để điền thông tin giữ chỗ.</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="three-floorplan-stage" id="resFloor3D">
+                <div id="resFloorTooltip" class="three-tooltip"></div>
+                <div class="three-canvas-overlay top-0 start-0 p-2 d-flex flex-wrap gap-1">
+                    <button type="button" class="btn btn-sm btn-dark bg-opacity-75 interactive-pill" data-res-zone="ALL">Toàn quán</button>
+                    <button type="button" class="btn btn-sm btn-dark bg-opacity-75 interactive-pill" data-res-zone="Tầng 1">Tầng 1</button>
+                    <button type="button" class="btn btn-sm btn-dark bg-opacity-75 interactive-pill" data-res-zone="Tầng 2">Tầng 2</button>
+                    <button type="button" class="btn btn-sm btn-dark bg-opacity-75 interactive-pill" data-res-zone="Sân vườn">Sân vườn</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <h2 class="h5 fw-bold mb-3">Thông tin đặt bàn</h2>
+                <form method="post" action="/reservation">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="TableId" class="form-label fw-semibold small">Bàn đã chọn *</label>
+                        <select asp-for="TableId" class="form-select" id="resTableSelect">
+                            <option value="">-- Click chọn trên sơ đồ 3D hoặc chọn tại đây --</option>
+                            @foreach (var t in tablesList)
+                            {
+                                <option value="@t.Id">@t.Code – @t.Zone (@t.Capacity khách) [@t.StatusText]</option>
+                            }
+                        </select>
+                        <span asp-validation-for="TableId" class="text-danger small"></span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-sm-7">
+                            <label asp-for="CustomerName" class="form-label fw-semibold small">Họ tên người đặt *</label>
+                            <input asp-for="CustomerName" class="form-control" placeholder="Nguyễn Văn A" />
+                            <span asp-validation-for="CustomerName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-5">
+                            <label asp-for="Phone" class="form-label fw-semibold small">Số điện thoại *</label>
+                            <input asp-for="Phone" class="form-control" placeholder="0912345678" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-7">
+                            <label asp-for="ReservedAtLocal" class="form-label fw-semibold small">Ngày &amp; Giờ đến *</label>
+                            <input asp-for="ReservedAtLocal" type="datetime-local" class="form-control" value="@Model.ReservedAtLocal.ToString("yyyy-MM-ddTHH:mm")" />
+                            <span asp-validation-for="ReservedAtLocal" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-5">
+                            <label asp-for="PartySize" class="form-label fw-semibold small">Số khách *</label>
+                            <input asp-for="PartySize" type="number" min="1" max="20" class="form-control" />
+                            <span asp-validation-for="PartySize" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Note" class="form-label fw-semibold small">Ghi chú (Tùy chọn)</label>
+                            <textarea asp-for="Note" rows="2" class="form-control" maxlength="200" placeholder="Ví dụ: Cần bàn gần ổ điện, sinh nhật..."></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-coffee w-100 mt-4">
+                        <i class="bi bi-calendar2-check-fill me-2"></i> Gửi yêu cầu đặt bàn
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initFloorPlan3D } from '/js/three-floorplan.js';
+
+        const selectEl = document.getElementById('resTableSelect');
+        const floor = initFloorPlan3D({
+            containerId: 'resFloor3D',
+            tooltipId: 'resFloorTooltip',
+            tables: @Html.Raw(tablesJson),
+            editable: false,
+            onlySelectAvailable: false,
+            onSelectTable: (tbl) => {
+                if (selectEl) selectEl.value = String(tbl.id);
+            }
+        });
+
+        selectEl?.addEventListener('change', () => {
+            const id = parseInt(selectEl.value, 10);
+            if (id) floor?.selectTable(id);
+        });
+
+        document.querySelectorAll('[data-res-zone]').forEach(btn => {
+            btn.addEventListener('click', () => floor?.focusZone(btn.dataset.resZone));
+        });
+    </script>
+}
+

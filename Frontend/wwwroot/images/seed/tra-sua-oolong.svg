@@ -1,0 +1,26 @@
+﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 340' width='400' height='340'>
+  <defs>
+    <linearGradient id='bg' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#422006'/>
+      <stop offset='100%' stop-color='#854D0E'/>
+    </linearGradient>
+    <radialGradient id='glow' cx='50%' cy='45%' r='50%'>
+      <stop offset='0%' stop-color='rgba(255,245,230,0.28)'/>
+      <stop offset='100%' stop-color='rgba(255,245,230,0)'/>
+    </radialGradient>
+  </defs>
+  <rect width='400' height='340' fill='url(#bg)' rx='16'/>
+  <circle cx='200' cy='165' r='145' fill='url(#glow)'/>
+  
+                <ellipse cx='200' cy='265' rx='68' ry='12' fill='rgba(0,0,0,0.3)'/>
+                <rect x='194' y='62' width='12' height='185' rx='5' fill='#2C1810'/>
+                <polygon points='145,108 255,108 240,258 160,258' fill='rgba(255,255,255,0.25)' stroke='rgba(255,255,255,0.7)' stroke-width='3'/>
+                <polygon points='149,130 251,130 238,254 162,254' fill='#A47551' opacity='0.92'/>
+                <path d='M147 110 Q200 120 253 110 L251 134 Q200 142 149 134 Z' fill='#FFFBEB'/>
+                <circle cx='175' cy='242' r='6' fill='#1C110A'/><circle cx='192' cy='245' r='6' fill='#1C110A'/>
+                <circle cx='210' cy='243' r='6' fill='#1C110A'/><circle cx='226' cy='240' r='6' fill='#1C110A'/>
+                <circle cx='184' cy='230' r='6' fill='#1C110A'/><circle cx='203' cy='231' r='6' fill='#1C110A'/>
+                <circle cx='219' cy='228' r='6' fill='#1C110A'/>
+  <text x='200' y='300' text-anchor='middle' fill='#FFFDF9' font-family='Segoe UI, sans-serif' font-size='17' font-weight='700'>Tr&#224; Sữa &#212; Long Rang</text>
+  <text x='200' y='321' text-anchor='middle' fill='rgba(255,246,235,0.8)' font-family='Segoe UI, sans-serif' font-size='12'>Đậm vị tr&#224; nướng</text>
+</svg>

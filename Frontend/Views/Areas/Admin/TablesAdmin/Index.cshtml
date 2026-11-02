@@ -1,0 +1,370 @@
+@using System.Text.Json
+@using CoffeeShop.Areas.Admin.Models
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@model TablesAdminViewModel
+@{
+    ViewData["Title"] = "Sơ đồ Bàn 3D & Quản lý Bàn";
+    var isEditing = Model.Form.Id > 0;
+    var antiToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+
+    var tables3dJson = JsonSerializer.Serialize(Model.Tables3D, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-box-fill me-2"></i>Trình chỉnh sửa Sơ đồ Bàn Không gian 3D</h4>
+        <div class="text-muted small">Xoay góc nhìn 3D bằng chuột trái/cuộn zoom, hoặc bật chế độ Kéo - Thả để sắp xếp vị trí bàn trực tiếp trên mặt sàn WebGL.</div>
+    </div>
+
+    <!-- Switch Bật chế độ Kéo - Thả vị trí bàn 3D -->
+    <div class="bg-white border rounded-pill px-3 py-2 shadow-xs d-flex align-items-center gap-2">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggleDrag3DSwitch" />
+            <label class="form-check-label fw-bold text-coffee" for="toggleDrag3DSwitch" style="cursor:pointer;">
+                <i class="bi bi-arrows-move me-1"></i>Bật chế độ Kéo - Thả vị trí bàn 3D
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Khung Sơ đồ Bàn 3D Three.js -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-2 position-relative">
+        <div id="adminFloor3DContainer" class="three-floorplan-stage">
+            <!-- Overlay góc trên trái: Chọn khu vực camera -->
+            <div class="three-canvas-overlay top-0 start-0 p-3 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-dark interactive-pill zone-cam-btn active" data-zone="">
+                    <i class="bi bi-arrows-fullscreen me-1"></i>Toàn cảnh
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-light bg-dark bg-opacity-75 interactive-pill zone-cam-btn" data-zone="Tầng 1">
+                    Tầng 1
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-light bg-dark bg-opacity-75 interactive-pill zone-cam-btn" data-zone="Tầng 2">
+                    Tầng 2
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-light bg-dark bg-opacity-75 interactive-pill zone-cam-btn" data-zone="Sân vườn">
+                    Sân vườn
+                </button>
+            </div>
+
+            <!-- Overlay góc trên phải: Chú thích màu trạng thái -->
+            <div class="three-canvas-overlay top-0 end-0 p-3 d-none d-md-flex gap-2">
+                <span class="badge bg-dark bg-opacity-75 border border-secondary px-2 py-2">
+                    <span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#10B981;"></span>Trống
+                </span>
+                <span class="badge bg-dark bg-opacity-75 border border-secondary px-2 py-2">
+                    <span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#F59E0B;"></span>Đang sử dụng
+                </span>
+                <span class="badge bg-dark bg-opacity-75 border border-secondary px-2 py-2">
+                    <span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#3B82F6;"></span>Đã đặt trước
+                </span>
+            </div>
+
+            <!-- Overlay góc dưới trái: Thông tin bàn đang chọn trong 3D -->
+            <div class="three-canvas-overlay bottom-0 start-0 p-3">
+                <div id="selectedTable3DCard" class="bg-dark bg-opacity-90 text-white rounded-3 p-3 border border-secondary interactive-pill" style="display:none; min-width: 250px;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong class="fs-6 text-warning" id="selTblCode">T1-01</strong>
+                        <span class="badge bg-secondary" id="selTblZone">Tầng 1</span>
+                    </div>
+                    <div class="small text-light opacity-75 mb-2" id="selTblMeta">4 khách • Trống</div>
+                    <div class="d-flex gap-2">
+                        <a href="#" id="selTblEditLink" class="btn btn-sm btn-accent text-white py-1 px-2" style="min-height: 30px;">
+                            <i class="bi bi-pencil-square me-1"></i>Sửa bàn này
+                        </a>
+                        <a href="#" id="selTblOrderLink" class="btn btn-sm btn-outline-light py-1 px-2" style="display:none; min-height: 30px;">
+                            <i class="bi bi-receipt me-1"></i>Xem đơn mở
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminFloor3DTooltip" class="three-tooltip"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Phần dưới: Form CRUD Bàn + Bảng danh sách Bàn -->
+<div class="row g-4" id="tableFormSection">
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi @(isEditing ? "bi-pencil-square text-warning" : "bi-plus-circle-fill text-coffee") me-2"></i>
+                    @(isEditing ? $"Chỉnh sửa Bàn {Model.Form.Code}" : "Thêm Bàn mới")
+                </h6>
+                @if (isEditing)
+                {
+                    <a href="/admin/tables" class="btn btn-sm btn-outline-secondary">Tạo mới</a>
+                }
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/tables/save">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" value="@Model.Form.Id" />
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Mã bàn <span class="text-danger">*</span></label>
+                            <input type="text" name="Code" class="form-control text-uppercase fw-bold" value="@Model.Form.Code" required maxlength="30" placeholder="T1-07" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Sức chứa (khách)</label>
+                            <input type="number" name="Capacity" class="form-control" value="@Model.Form.Capacity" min="1" max="20" required />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Khu vực không gian</label>
+                        <select name="Zone" id="formZoneSelect" class="form-select">
+                            <option value="Tầng 1" selected="@(Model.Form.Zone == "Tầng 1")">Tầng 1 (Sàn trái)</option>
+                            <option value="Tầng 2" selected="@(Model.Form.Zone == "Tầng 2")">Tầng 2 (Sàn phải trên)</option>
+                            <option value="Sân vườn" selected="@(Model.Form.Zone == "Sân vườn")">Sân vườn (Sàn phải dưới)</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Tọa độ 3D PosX (m)</label>
+                            <input type="number" step="0.1" min="-12" max="12" name="PosX" id="formPosX" class="form-control form-control-sm font-monospace" value="@Model.Form.PosX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Tọa độ 3D PosY (m)</label>
+                            <input type="number" step="0.1" min="-12" max="12" name="PosY" id="formPosY" class="form-control form-control-sm font-monospace" value="@Model.Form.PosY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted">Mẹo: Tầng 1 có X &lt; 0; Tầng 2 có X &gt; 0 &amp; Y &lt; 1.3; Sân vườn có X &gt; 0 &amp; Y &ge; 1.3.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="tblActiveSwitch" name="IsActive" value="true" checked="@Model.Form.IsActive" />
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="form-check-label fw-semibold" for="tblActiveSwitch">Đang phục vụ (Hiển thị trên sơ đồ 3D)</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-coffee">
+                            <i class="bi bi-check2-circle me-1"></i>@(isEditing ? "Lưu thông tin Bàn" : "Thêm Bàn vào Sơ đồ")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="fw-bold mb-0">Danh sách Bàn (@Model.Tables.Count)</h6>
+                <div class="btn-group btn-group-sm">
+                    <a href="/admin/tables" class="btn @(string.IsNullOrEmpty(Model.ZoneFilter) ? "btn-coffee" : "btn-outline-secondary")">Tất cả</a>
+                    <a href="/admin/tables?zone=T%E1%BA%A7ng%201" class="btn @(Model.ZoneFilter == "Tầng 1" ? "btn-coffee" : "btn-outline-secondary")">Tầng 1</a>
+                    <a href="/admin/tables?zone=T%E1%BA%A7ng%202" class="btn @(Model.ZoneFilter == "Tầng 2" ? "btn-coffee" : "btn-outline-secondary")">Tầng 2</a>
+                    <a href="/admin/tables?zone=S%C3%A2n%20v%C6%B0%E1%BB%9Dn" class="btn @(Model.ZoneFilter == "Sân vườn" ? "btn-coffee" : "btn-outline-secondary")">Sân vườn</a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Mã bàn</th>
+                            <th>Khu vực</th>
+                            <th class="text-center">Sức chứa</th>
+                            <th class="text-center">Tọa độ 3D (X, Y)</th>
+                            <th class="text-center">Tình trạng</th>
+                            <th class="text-center">Kích hoạt</th>
+                            <th class="text-end pe-3">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Tables.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">Chưa có bàn nào trong khu vực này.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var t in Model.Tables)
+                            {
+                                var hasOpen = Model.TableIdsWithOpenOrder.Contains(t.Id);
+                                <tr id="table-row-@t.Id">
+                                    <td class="ps-3 fw-bold text-coffee">@t.Code</td>
+                                    <td class="row-zone">
+                                        <span class="badge bg-cream text-coffee border">@t.Zone</span>
+                                    </td>
+                                    <td class="text-center">@t.Capacity khách</td>
+                                    <td class="text-center font-monospace small text-muted row-coords">
+                                        (@t.PosX.ToString("0.00"), @t.PosY.ToString("0.00"))
+                                    </td>
+                                    <td class="text-center">
+                                        @if (hasOpen || t.Status == TableStatus.Occupied)
+                                        {
+                                            <span class="badge bg-warning text-dark">Đang sử dụng</span>
+                                        }
+                                        else if (t.Status == TableStatus.Reserved)
+                                        {
+                                            <span class="badge bg-primary">Đã đặt trước</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Trống</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (t.IsActive)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Hoạt động</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Tạm ngưng</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/admin/tables?editId=@t.Id#tableFormSection" class="btn btn-sm btn-light border" title="Sửa bàn">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="/admin/tables/toggle/@t.Id" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border" title="@(t.IsActive ? "Tạm ngưng bàn" : "Mở phục vụ lại")">
+                                                    <i class="bi @(t.IsActive ? "bi-pause-circle text-warning" : "bi-play-circle text-success")"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/admin/tables/delete/@t.Id" class="d-inline"
+                                                  onsubmit="return confirm('Xác nhận xóa bàn &quot;@t.Code&quot;? (Bàn có đơn đang mở sẽ bị chặn xóa)');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border text-danger" disabled="@hasOpen" title="Xóa mềm bàn">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initFloorPlan3D } from '/js/three-floorplan.js';
+
+        const initialTables = @Html.Raw(tables3dJson);
+        const csrfToken = '@antiToken';
+
+        const floor3d = initFloorPlan3D({
+            containerId: 'adminFloor3DContainer',
+            tooltipId: 'adminFloor3DTooltip',
+            tables: initialTables,
+            editable: true,
+            onSelectTable: (tbl) => {
+                const card = document.getElementById('selectedTable3DCard');
+                if (!card) return;
+                document.getElementById('selTblCode').textContent = tbl.code;
+                document.getElementById('selTblZone').textContent = tbl.zone;
+                document.getElementById('selTblMeta').textContent = `${tbl.capacity} khách • ${tbl.statusText} • (${tbl.posX}, ${tbl.posY})`;
+                document.getElementById('selTblEditLink').href = `/admin/tables?editId=${tbl.id}#tableFormSection`;
+
+                const orderBtn = document.getElementById('selTblOrderLink');
+                if (tbl.activeOrderId) {
+                    orderBtn.href = `/admin/orders/detail/${tbl.activeOrderId}`;
+                    orderBtn.style.display = 'inline-flex';
+                } else {
+                    orderBtn.style.display = 'none';
+                }
+                card.style.display = 'block';
+            },
+            onPositionChanged: async (tbl) => {
+                try {
+                    const res = await fetch('/admin/tables/update-position', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            id: tbl.id,
+                            posX: tbl.posX,
+                            posY: tbl.posY,
+                            zone: tbl.zone
+                        })
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok || !data.success) {
+                        window.DatMocRealtime?.showToast('Lỗi lưu vị trí 3D', data.message || 'Không thể lưu tọa độ bàn.', 'danger');
+                        return;
+                    }
+
+                    window.DatMocRealtime?.showToast(
+                        `Đã lưu bàn ${tbl.code}`,
+                        `Tọa độ mới: (${data.posX.toFixed(2)}, ${data.posY.toFixed(2)}) • ${data.zone}`,
+                        'success'
+                    );
+
+                    // Cập nhật trực tiếp dòng trong bảng HTML mà không cần reload trang
+                    const row = document.getElementById(`table-row-${tbl.id}`);
+                    if (row) {
+                        const coordCell = row.querySelector('.row-coords');
+                        const zoneCell = row.querySelector('.row-zone');
+                        if (coordCell) coordCell.textContent = `(${data.posX.toFixed(2)}, ${data.posY.toFixed(2)})`;
+                        if (zoneCell) zoneCell.innerHTML = `<span class="badge bg-cream text-coffee border">${data.zone}</span>`;
+                    }
+                } catch (err) {
+                    window.DatMocRealtime?.showToast('Lỗi kết nối', 'Không thể gửi yêu cầu cập nhật vị trí bàn 3D.', 'danger');
+                }
+            }
+        });
+
+        // Tắt lưới kéo-thả lúc đầu cho tới khi Admin gạt Switch
+        floor3d?.setDragMode(false);
+
+        const dragSwitch = document.getElementById('toggleDrag3DSwitch');
+        dragSwitch?.addEventListener('change', function () {
+            floor3d?.setDragMode(this.checked);
+            if (this.checked) {
+                window.DatMocRealtime?.showToast(
+                    'Chế độ Kéo - Thả 3D đã bật',
+                    'Nhấn giữ chuột trái vào bàn trên mặt sàn 3D để di chuyển và tự động lưu tọa độ.',
+                    'primary'
+                );
+            }
+        });
+
+        // Chuyển góc camera theo khu vực
+        document.querySelectorAll('.zone-cam-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.zone-cam-btn').forEach(b => {
+                    b.classList.remove('btn-dark', 'active');
+                    b.classList.add('btn-outline-light', 'bg-dark', 'bg-opacity-75');
+                });
+                btn.classList.remove('btn-outline-light', 'bg-opacity-75');
+                btn.classList.add('btn-dark', 'active');
+                floor3d?.focusZone(btn.dataset.zone || '');
+            });
+        });
+
+        // Tự động gán tọa độ gợi ý khi đổi khu vực ở Form tạo mới
+        const isCreating = @(isEditing ? "false" : "true");
+        if (isCreating) {
+            document.getElementById('formZoneSelect')?.addEventListener('change', function () {
+                const px = document.getElementById('formPosX');
+                const py = document.getElementById('formPosY');
+                if (!px || !py) return;
+                if (this.value === 'Tầng 1') { px.value = '-2.4'; py.value = '0.0'; }
+                else if (this.value === 'Tầng 2') { px.value = '4.2'; py.value = '-2.0'; }
+                else if (this.value === 'Sân vườn') { px.value = '4.2'; py.value = '4.6'; }
+            });
+        }
+    </script>
+}

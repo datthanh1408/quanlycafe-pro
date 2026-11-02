@@ -1,0 +1,358 @@
+@using System.Text.Json
+@using CoffeeShop.Areas.Admin.Models
+@model EmployeesAdminViewModel
+@{
+    ViewData["Title"] = "Nhân viên & Phân quyền";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-person-badge-fill me-2"></i>Quản lý Nhân sự &amp; Phân quyền Mở rộng (◐)</h4>
+        <div class="text-muted small">Quản lý tài khoản Nhân viên (Staff) &amp; Quản trị viên (Admin), cấp quyền mở rộng theo Claim và bảo vệ tài khoản Admin cuối cùng.</div>
+    </div>
+    <button type="button" class="btn btn-coffee px-3" data-bs-toggle="modal" data-bs-target="#createEmployeeModal">
+        <i class="bi bi-person-plus-fill me-1"></i>Thêm Nhân viên mới
+    </button>
+</div>
+
+<!-- Giải thích các quyền mở rộng ◐ -->
+<div class="alert bg-cream border border-secondary border-opacity-25 py-2 px-3 mb-4 small">
+    <strong class="text-coffee"><i class="bi bi-shield-lock-fill me-1"></i>Hệ thống Quyền mở rộng (◐ Permission Claims) cho Nhân viên:</strong>
+    <span class="text-muted">Nhân viên mặc định xử lý POS &amp; bàn. Admin có thể cấp/thu hồi linh hoạt 5 quyền mở rộng cho từng nhân viên mà không cần nâng lên toàn quyền Admin.</span>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0">Danh sách Nhân sự (@Model.Employees.Count tài khoản)</h6>
+        <span class="small text-muted">Số Admin đang hoạt động: <strong>@Model.ActiveAdminCount</strong></span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Nhân viên</th>
+                    <th>Vai trò &amp; Vị trí</th>
+                    <th>Ngày vào làm / TT</th>
+                    <th>Quyền mở rộng được cấp (◐)</th>
+                    <th class="text-center">Tài khoản</th>
+                    <th class="text-end pe-3">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var emp in Model.Employees)
+                {
+                    var isSelf = emp.Id == Model.CurrentUserId;
+                    var isLastActiveAdmin = emp.Role == AppRoles.Admin && emp.IsActive && Model.ActiveAdminCount <= 1;
+                    var permsJson = JsonSerializer.Serialize(emp.GrantedPermissions);
+
+                    <tr>
+                        <td class="ps-3">
+                            <div class="fw-bold d-flex align-items-center gap-1">
+                                @emp.FullName
+                                @if (isSelf)
+                                {
+                                    <span class="badge bg-primary-subtle text-primary border">Bạn</span>
+                                }
+                            </div>
+                            <div class="small text-muted">@emp.Email @(string.IsNullOrWhiteSpace(emp.Phone) ? "" : $"• {emp.Phone}")</div>
+                            @if (emp.MustChangePassword)
+                            {
+                                <span class="badge bg-warning-subtle text-dark border mt-1">Chờ đổi mật khẩu lần đầu</span>
+                            }
+                        </td>
+                        <td>
+                            @if (emp.Role == AppRoles.Admin)
+                            {
+                                <span class="badge bg-coffee">Admin</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-info text-dark">Staff</span>
+                            }
+                            <div class="small fw-semibold mt-1">@emp.Position</div>
+                        </td>
+                        <td class="small">
+                            <div>@FormatHelper.DateTimeVn(emp.HireDate, "dd/MM/yyyy")</div>
+                            <span class="badge bg-light text-dark border">@emp.WorkStatus</span>
+                        </td>
+                        <td style="max-width: 340px;">
+                            @if (emp.Role == AppRoles.Admin)
+                            {
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-stars me-1"></i>Toàn quyền Quản trị hệ thống
+                                </span>
+                            }
+                            else if (emp.GrantedPermissions.Count == 0)
+                            {
+                                <span class="text-muted small fst-italic">Quyền POS cơ bản</span>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var p in emp.GrantedPermissions)
+                                    {
+                                        <span class="badge bg-cream text-coffee border" title="@(StaffPermissions.All.TryGetValue(p, out var desc) ? desc : p)">
+                                            ◐ @p.Replace("Staff.", "")
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (emp.IsActive)
+                            {
+                                <span class="badge bg-success">Hoạt động</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Đã khóa</span>
+                            }
+                        </td>
+                        <td class="text-end pe-3">
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-light border btn-edit-emp"
+                                        data-id="@emp.Id"
+                                        data-name="@emp.FullName"
+                                        data-phone="@(emp.Phone ?? "")"
+                                        data-role="@emp.Role"
+                                        data-position="@emp.Position"
+                                        data-hire="@emp.HireDate.ToString("yyyy-MM-dd")"
+                                        data-work="@emp.WorkStatus"
+                                        data-perms='@Html.Raw(permsJson)'
+                                        title="Sửa hồ sơ & Phân quyền ◐">
+                                    <i class="bi bi-sliders text-coffee"></i> Quyền
+                                </button>
+
+                                <button type="button" class="btn btn-sm btn-light border btn-reset-pwd"
+                                        data-id="@emp.Id"
+                                        data-name="@emp.FullName"
+                                        title="Cấp lại mật khẩu tạm thời">
+                                    <i class="bi bi-key text-warning"></i>
+                                </button>
+
+                                <form method="post" action="/admin/employees/toggle-lock" class="d-inline"
+                                      onsubmit="return confirm('Xác nhận @(emp.IsActive ? "khóa" : "mở khóa") tài khoản &quot;@emp.FullName&quot;?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="userId" value="@emp.Id" />
+                                    <button type="submit" class="btn btn-sm btn-light border @(emp.IsActive ? "text-danger" : "text-success")"
+                                            disabled="@(isSelf || isLastActiveAdmin)"
+                                            title="@(isSelf ? "Không thể tự khóa chính mình" : (isLastActiveAdmin ? "Không thể khóa Admin cuối cùng" : (emp.IsActive ? "Khóa tài khoản" : "Mở khóa tài khoản")))">
+                                        <i class="bi @(emp.IsActive ? "bi-lock-fill" : "bi-unlock-fill")"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal 1: Tạo Nhân viên mới -->
+<div class="modal fade" id="createEmployeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="post" action="/admin/employees/create" class="modal-content">
+            @Html.AntiForgeryToken()
+            <div class="modal-header bg-coffee text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-person-plus-fill me-2"></i>Tạo Tài khoản Nhân viên Mới</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Họ và tên <span class="text-danger">*</span></label>
+                        <input type="text" name="FullName" class="form-control" required maxlength="120" placeholder="Nguyễn Văn A" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Email đăng nhập <span class="text-danger">*</span></label>
+                        <input type="email" name="Email" class="form-control" required placeholder="nhanvien@datmoccoffee.local" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Số điện thoại</label>
+                        <input type="text" name="Phone" class="form-control" maxlength="20" placeholder="0901234567" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Mật khẩu tạm thời <span class="text-danger">*</span></label>
+                        <input type="text" name="TemporaryPassword" class="form-control font-monospace fw-bold" value="Staff@123" required minlength="8" />
+                        <div class="form-text">Nhân viên sẽ bị bắt buộc đổi mật khẩu ngay lần đăng nhập đầu tiên.</div>
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label fw-semibold">Vị trí công việc</label>
+                        <input type="text" name="Position" class="form-control" value="Barista / Thu ngân" required />
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <label class="form-label fw-semibold">Ngày vào làm</label>
+                        <input type="date" name="HireDate" class="form-control" value="@FormatHelper.VnNow().ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-semibold">Trạng thái làm việc</label>
+                        <select name="WorkStatus" class="form-select">
+                            <option value="Đang làm">Đang làm</option>
+                            <option value="Nghỉ phép">Nghỉ phép</option>
+                            <option value="Đã nghỉ">Đã nghỉ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-3 bg-light border">
+                    <h6 class="fw-bold mb-2 text-coffee"><i class="bi bi-shield-check me-1"></i>Cấp Quyền Mở Rộng (◐ StaffPermissions)</h6>
+                    <div class="row g-2">
+                        @foreach (var kv in StaffPermissions.All)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="d-flex align-items-start gap-2 border rounded bg-white p-2 h-100" style="cursor:pointer;">
+                                    <input type="checkbox" class="form-check-input mt-1" name="Permissions" value="@kv.Key" />
+                                    <span>
+                                        <strong class="d-block small text-coffee">◐ @kv.Key</strong>
+                                        <small class="text-muted">@kv.Value</small>
+                                    </span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-coffee">Tạo Nhân viên &amp; Cấp quyền</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Sửa Hồ sơ & Phân quyền ◐ -->
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="post" action="/admin/employees/edit" class="modal-content">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="UserId" id="editEmpId" />
+            <div class="modal-header bg-cream">
+                <h6 class="modal-title fw-bold text-coffee" id="editEmpTitle">Cập nhật Hồ sơ &amp; Quyền hạn</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Họ và tên <span class="text-danger">*</span></label>
+                        <input type="text" name="FullName" id="editEmpName" class="form-control" required maxlength="120" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold">Số điện thoại</label>
+                        <input type="text" name="Phone" id="editEmpPhone" class="form-control" maxlength="20" />
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label fw-semibold">Vị trí công việc</label>
+                        <input type="text" name="Position" id="editEmpPosition" class="form-control" required />
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <label class="form-label fw-semibold">Ngày vào làm</label>
+                        <input type="date" name="HireDate" id="editEmpHireDate" class="form-control" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label fw-semibold">Trạng thái làm việc</label>
+                        <select name="WorkStatus" id="editEmpWorkStatus" class="form-select">
+                            <option value="Đang làm">Đang làm</option>
+                            <option value="Nghỉ phép">Nghỉ phép</option>
+                            <option value="Đã nghỉ">Đã nghỉ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-3 bg-light border" id="editPermissionsBox">
+                    <h6 class="fw-bold mb-2 text-coffee"><i class="bi bi-shield-check me-1"></i>Phân quyền Mở rộng (◐ StaffPermissions)</h6>
+                    <div class="row g-2">
+                        @foreach (var kv in StaffPermissions.All)
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="d-flex align-items-start gap-2 border rounded bg-white p-2 h-100" style="cursor:pointer;">
+                                    <input type="checkbox" class="form-check-input mt-1 edit-perm-chk" name="Permissions" value="@kv.Key" />
+                                    <span>
+                                        <strong class="d-block small text-coffee">◐ @kv.Key</strong>
+                                        <small class="text-muted">@kv.Value</small>
+                                    </span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="alert alert-success small mb-0 mt-2" id="editAdminNotice" style="display:none;">
+                    <i class="bi bi-stars me-1"></i>Tài khoản này thuộc vai trò <strong>Admin</strong> nên mặc định có toàn bộ quyền hạn trên hệ thống.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-coffee">Lưu Hồ sơ &amp; Quyền hạn</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 3: Cấp lại Mật khẩu tạm thời -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="/admin/employees/reset-password" class="modal-content">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="userId" id="resetPwdUserId" />
+            <div class="modal-header bg-warning-subtle">
+                <h6 class="modal-title fw-bold"><i class="bi bi-key-fill me-2"></i>Đặt lại Mật khẩu Tạm thời</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small">Đặt mật khẩu tạm mới cho nhân viên <strong id="resetPwdEmpName"></strong>. Cờ <code>MustChangePassword = true</code> sẽ được bật để bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp.</p>
+                <div>
+                    <label class="form-label fw-semibold">Mật khẩu tạm mới <span class="text-danger">*</span></label>
+                    <input type="text" name="temporaryPassword" class="form-control font-monospace fw-bold" value="Staff@123" required minlength="8" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-warning fw-bold">Xác nhận Đặt lại</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const editModalEl = document.getElementById('editEmployeeModal');
+            const resetModalEl = document.getElementById('resetPasswordModal');
+            const editModal = editModalEl ? new bootstrap.Modal(editModalEl) : null;
+            const resetModal = resetModalEl ? new bootstrap.Modal(resetModalEl) : null;
+
+            document.querySelectorAll('.btn-edit-emp').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('editEmpId').value = btn.dataset.id;
+                    document.getElementById('editEmpTitle').textContent = `Hồ sơ & Quyền hạn: ${btn.dataset.name}`;
+                    document.getElementById('editEmpName').value = btn.dataset.name;
+                    document.getElementById('editEmpPhone').value = btn.dataset.phone;
+                    document.getElementById('editEmpPosition').value = btn.dataset.position;
+                    document.getElementById('editEmpHireDate').value = btn.dataset.hire;
+                    document.getElementById('editEmpWorkStatus').value = btn.dataset.work;
+
+                    let perms = [];
+                    try { perms = JSON.parse(btn.dataset.perms || '[]'); } catch (_) {}
+
+                    document.querySelectorAll('.edit-perm-chk').forEach(chk => {
+                        chk.checked = perms.includes(chk.value);
+                    });
+
+                    const isAdmin = btn.dataset.role === 'Admin';
+                    document.getElementById('editPermissionsBox').style.display = isAdmin ? 'none' : 'block';
+                    document.getElementById('editAdminNotice').style.display = isAdmin ? 'block' : 'none';
+
+                    editModal?.show();
+                });
+            });
+
+            document.querySelectorAll('.btn-reset-pwd').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('resetPwdUserId').value = btn.dataset.id;
+                    document.getElementById('resetPwdEmpName').textContent = btn.dataset.name;
+                    resetModal?.show();
+                });
+            });
+        })();
+    </script>
+}

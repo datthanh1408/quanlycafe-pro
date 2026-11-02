@@ -1,0 +1,442 @@
+@using CoffeeShop.Areas.Admin.Models
+@model InventoryAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Kho Nguyên liệu";
+    var lowCount = Model.Ingredients.Count(i => i.StockQty <= i.MinThreshold);
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-boxes me-2"></i>Kho Nguyên liệu &amp; Lịch sử Xuất Nhập Tồn</h4>
+        <div class="text-muted small">Quản lý danh mục nguyên liệu F&amp;B, cảnh báo định mức tồn tối thiểu và ghi nhận Nhập kho / Xuất kho / Điều chỉnh / Hao hụt.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-accent text-white px-3" id="btnOpenTxModalDefault">
+            <i class="bi bi-arrow-left-right me-1"></i>Tạo Giao dịch Kho
+        </button>
+        <button type="button" class="btn btn-coffee px-3" id="btnOpenNewIngredientModal">
+            <i class="bi bi-plus-lg me-1"></i>Thêm Nguyên liệu
+        </button>
+    </div>
+</div>
+
+<!-- Phần 1: Tìm kiếm & Danh sách Nguyên liệu -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+        <form method="get" action="/admin/inventory" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" value="@Model.Search" placeholder="Tìm mã NL-001 hoặc tên nguyên liệu..." />
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="lowStockSwitch" name="lowStockOnly" value="true" checked="@Model.LowStockOnly" onchange="this.form.submit()" />
+                    <label class="form-check-label small fw-semibold @(Model.LowStockOnly ? "text-danger" : "")" for="lowStockSwitch">
+                        Chỉ hiện nguyên liệu sắp hết (@lowCount)
+                    </label>
+                </div>
+            </div>
+            <div class="col-auto ms-auto d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-coffee" style="min-height: 34px;">Tìm kiếm</button>
+                <a href="/admin/inventory" class="btn btn-sm btn-light border">Đặt lại</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Mã NL</th>
+                    <th>Tên nguyên liệu</th>
+                    <th class="text-center">Đơn vị</th>
+                    <th class="text-end">Tồn hiện tại</th>
+                    <th class="text-end">Ngưỡng tối thiểu</th>
+                    <th class="text-center">Cảnh báo</th>
+                    <th class="text-center">Trạng thái</th>
+                    <th class="text-end pe-3">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Ingredients.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">Không tìm thấy nguyên liệu nào.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var ing in Model.Ingredients)
+                    {
+                        var isLow = ing.StockQty <= ing.MinThreshold;
+                        <tr class="@(isLow ? "table-warning bg-opacity-25" : "")">
+                            <td class="ps-3">
+                                <code class="fw-bold text-dark">@ing.Code</code>
+                            </td>
+                            <td class="fw-bold">@ing.Name</td>
+                            <td class="text-center"><span class="badge bg-light text-dark border">@ing.Unit</span></td>
+                            <td class="text-end fw-bold @(isLow ? "text-danger" : "text-coffee")">
+                                @ing.StockQty.ToString("0.##") @ing.Unit
+                            </td>
+                            <td class="text-end text-muted">@ing.MinThreshold.ToString("0.##") @ing.Unit</td>
+                            <td class="text-center">
+                                @if (ing.StockQty <= 0)
+                                {
+                                    <span class="badge bg-danger"><i class="bi bi-x-octagon-fill me-1"></i>Hết hàng</span>
+                                }
+                                else if (isLow)
+                                {
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sắp hết</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Đủ tồn</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @if (ing.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success">Đang dùng</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary">Tạm ngưng</span>
+                                }
+                            </td>
+                            <td class="text-end pe-3">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-success py-1 px-2 btn-quick-tx"
+                                            data-id="@ing.Id" data-name="@ing.Name" data-unit="@ing.Unit" data-stock="@ing.StockQty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" data-type="Import"
+                                            title="Nhập kho nguyên liệu này">
+                                        <i class="bi bi-box-arrow-in-down"></i> Nhập
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 btn-quick-tx"
+                                            data-id="@ing.Id" data-name="@ing.Name" data-unit="@ing.Unit" data-stock="@ing.StockQty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" data-type="Adjust"
+                                            title="Kiểm kê điều chỉnh / Xuất / Hao hụt">
+                                        <i class="bi bi-sliders"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light border py-1 px-2 btn-edit-ing"
+                                            data-id="@ing.Id"
+                                            data-code="@ing.Code"
+                                            data-name="@ing.Name"
+                                            data-unit="@ing.Unit"
+                                            data-min="@ing.MinThreshold.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                            data-active="@(ing.IsActive ? "true" : "false")"
+                                            title="Sửa thông tin nguyên liệu">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="post" action="/admin/inventory/delete-ingredient/@ing.Id" class="d-inline"
+                                          onsubmit="return confirm('Xác nhận xóa nguyên liệu &quot;@ing.Name&quot;?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger py-1 px-2" title="Xóa mềm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Phần 2: Lịch sử Biến động Kho (StockTransactions) -->
+<div class="card border-0 shadow-sm" id="stockHistorySection">
+    <div class="card-header bg-white border-bottom py-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h6 class="fw-bold mb-0"><i class="bi bi-clock-history text-coffee me-2"></i>Lịch sử Biến động Kho (@Model.PagedTransactions.TotalItems giao dịch)</h6>
+        </div>
+        <form method="get" action="/admin/inventory#stockHistorySection" class="row g-2 align-items-end">
+            <input type="hidden" name="search" value="@Model.Search" />
+            @if (Model.LowStockOnly)
+            {
+                <input type="hidden" name="lowStockOnly" value="true" />
+            }
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold mb-1">Lọc theo nguyên liệu</label>
+                <select name="ingredientId" class="form-select form-select-sm">
+                    <option value="">-- Tất cả nguyên liệu --</option>
+                    @foreach (var ing in Model.AllIngredientsDropdown)
+                    {
+                        <option value="@ing.Id" selected="@(Model.TxIngredientId == ing.Id)">[@ing.Code] @ing.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Loại giao dịch</label>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var tp in Enum.GetValues<StockTransactionType>())
+                    {
+                        <option value="@tp" selected="@(Model.TxType == tp)">@tp.GetDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Từ ngày</label>
+                <input type="date" name="fromDate" class="form-control form-control-sm" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Đến ngày</label>
+                <input type="date" name="toDate" class="form-control form-control-sm" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+            <div class="col-6 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-outline-coffee flex-grow-1" style="min-height: 32px;">Lọc lịch sử</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Thời gian (VN)</th>
+                    <th>Nguyên liệu</th>
+                    <th>Loại GD</th>
+                    <th class="text-end">Biến động</th>
+                    <th class="text-end">Tồn sau GD</th>
+                    <th class="text-end">Đơn giá nhập</th>
+                    <th>Lý do / Đơn hàng</th>
+                    <th class="pe-3">Người thực hiện</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.PagedTransactions.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">Chưa có lịch sử giao dịch kho phù hợp.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var tx in Model.PagedTransactions.Items)
+                    {
+                        var typeBadge = tx.Type switch
+                        {
+                            StockTransactionType.Import => "bg-success",
+                            StockTransactionType.Sale => "bg-primary",
+                            StockTransactionType.Adjust => "bg-info text-dark",
+                            StockTransactionType.Wastage => "bg-danger",
+                            StockTransactionType.Export => "bg-warning text-dark",
+                            _ => "bg-secondary"
+                        };
+                        <tr>
+                            <td class="ps-3 small text-muted">@FormatHelper.DateTimeVn(tx.CreatedAt)</td>
+                            <td>
+                                <span class="fw-semibold">@tx.Ingredient.Name</span>
+                                <small class="text-muted">(@tx.Ingredient.Code)</small>
+                            </td>
+                            <td><span class="badge @typeBadge">@tx.Type.GetDisplayName()</span></td>
+                            <td class="text-end fw-bold @(tx.Quantity >= 0 ? "text-success" : "text-danger")">
+                                @(tx.Quantity >= 0 ? "+" : "")@tx.Quantity.ToString("0.##") @tx.Ingredient.Unit
+                            </td>
+                            <td class="text-end fw-semibold">@tx.BalanceAfter.ToString("0.##") @tx.Ingredient.Unit</td>
+                            <td class="text-end small text-muted">@(tx.UnitCost > 0 ? FormatHelper.Vnd(tx.UnitCost) : "-")</td>
+                            <td class="small">
+                                @tx.Reason
+                                @if (tx.OrderId.HasValue)
+                                {
+                                    <a href="/admin/orders/detail/@tx.OrderId.Value" class="ms-1 text-coffee fw-semibold text-decoration-none">
+                                        (#@(tx.Order?.Code ?? tx.OrderId.Value.ToString()))
+                                    </a>
+                                }
+                            </td>
+                            <td class="pe-3 small">@tx.CreatedBy</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-0 pb-3">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.PagedTransactions.Page, Model.PagedTransactions.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>
+
+<!-- Modal 1: Thêm / Sửa Nguyên liệu -->
+<div class="modal fade" id="ingredientModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="/admin/inventory/save-ingredient" class="modal-content">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Id" id="ingId" value="0" />
+            <div class="modal-header bg-cream">
+                <h6 class="modal-title fw-bold text-coffee" id="ingModalTitle">Thêm Nguyên liệu mới</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-5">
+                        <label class="form-label fw-semibold">Mã nguyên liệu <span class="text-danger">*</span></label>
+                        <input type="text" name="Code" id="ingCode" class="form-control text-uppercase fw-bold" required maxlength="30" placeholder="NL-025" />
+                    </div>
+                    <div class="col-7">
+                        <label class="form-label fw-semibold">Đơn vị tính <span class="text-danger">*</span></label>
+                        <input type="text" name="Unit" id="ingUnit" class="form-control" required maxlength="30" placeholder="g, ml, cái, hộp..." value="g" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Tên nguyên liệu <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" id="ingName" class="form-control" required maxlength="120" placeholder="VD: Hạt Cà phê Arabica Cầu Đất" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Ngưỡng cảnh báo tồn tối thiểu</label>
+                        <input type="number" step="0.01" min="0" name="MinThreshold" id="ingMinThreshold" class="form-control" value="500" />
+                        <div class="form-text">Khi tồn hiện tại &le; ngưỡng này, hệ thống sẽ bật cảnh báo đỏ trên Dashboard &amp; Sidebar.</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" name="IsActive" id="ingIsActive" value="true" checked />
+                            <input type="hidden" name="IsActive" value="false" />
+                            <label class="form-check-label fw-semibold" for="ingIsActive">Đang sử dụng trong pha chế</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+                <button type="submit" class="btn btn-coffee">Lưu Nguyên liệu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Thực hiện Giao dịch Kho (Nhập / Xuất / Điều chỉnh / Hao hụt) -->
+<div class="modal fade" id="stockTxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="/admin/inventory/transaction" class="modal-content">
+            @Html.AntiForgeryToken()
+            <div class="modal-header bg-coffee text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-arrow-left-right me-2"></i>Ghi nhận Giao dịch Kho</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Chọn Nguyên liệu <span class="text-danger">*</span></label>
+                    <select name="IngredientId" id="txIngredientSelect" class="form-select" required>
+                        @foreach (var ing in Model.AllIngredientsDropdown)
+                        {
+                            <option value="@ing.Id" data-unit="@ing.Unit" data-stock="@ing.StockQty.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)">
+                                [@ing.Code] @ing.Name (Tồn hiện tại: @ing.StockQty.ToString("0.##") @ing.Unit)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Loại giao dịch <span class="text-danger">*</span></label>
+                    <select name="Type" id="txTypeSelect" class="form-select">
+                        <option value="Import">Nhập kho (+ Cộng thêm tồn)</option>
+                        <option value="Export">Xuất kho (- Trừ tồn)</option>
+                        <option value="Adjust">Điều chỉnh kiểm kê (= Nhập mức tồn thực tế mới)</option>
+                        <option value="Wastage">Hao hụt / Hủy nguyên liệu hỏng (- Trừ tồn)</option>
+                    </select>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold" id="txQtyLabel">Số lượng <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" name="Quantity" id="txQtyInput" class="form-control fw-bold" value="100" required />
+                            <span class="input-group-text" id="txUnitBadge">g</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Đơn giá vốn (₫)</label>
+                        <div class="input-group">
+                            <input type="number" step="100" min="0" name="UnitCost" id="txUnitCost" class="form-control" value="0" />
+                            <span class="input-group-text">₫</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label fw-semibold">Lý do / Chứng từ giao dịch <span class="text-danger">*</span></label>
+                    <textarea name="Reason" rows="2" class="form-control" required maxlength="200" placeholder="VD: Nhập lô hạt cà phê nhà cung cấp Cầu Đất phiếu #NK-102..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-coffee">Xác nhận Ghi sổ Kho</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const ingModalEl = document.getElementById('ingredientModal');
+            const txModalEl = document.getElementById('stockTxModal');
+            const ingModal = ingModalEl ? new bootstrap.Modal(ingModalEl) : null;
+            const txModal = txModalEl ? new bootstrap.Modal(txModalEl) : null;
+
+            // Mở modal thêm mới nguyên liệu
+            document.getElementById('btnOpenNewIngredientModal')?.addEventListener('click', () => {
+                document.getElementById('ingModalTitle').textContent = 'Thêm Nguyên liệu mới';
+                document.getElementById('ingId').value = '0';
+                document.getElementById('ingCode').value = '';
+                document.getElementById('ingName').value = '';
+                document.getElementById('ingUnit').value = 'g';
+                document.getElementById('ingMinThreshold').value = '500';
+                document.getElementById('ingIsActive').checked = true;
+                ingModal?.show();
+            });
+
+            // Mở modal sửa nguyên liệu
+            document.querySelectorAll('.btn-edit-ing').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('ingModalTitle').textContent = `Sửa Nguyên liệu: ${btn.dataset.name}`;
+                    document.getElementById('ingId').value = btn.dataset.id;
+                    document.getElementById('ingCode').value = btn.dataset.code;
+                    document.getElementById('ingName').value = btn.dataset.name;
+                    document.getElementById('ingUnit').value = btn.dataset.unit;
+                    document.getElementById('ingMinThreshold').value = btn.dataset.min;
+                    document.getElementById('ingIsActive').checked = btn.dataset.active === 'true';
+                    ingModal?.show();
+                });
+            });
+
+            const txSelect = document.getElementById('txIngredientSelect');
+            const txType = document.getElementById('txTypeSelect');
+            const txQtyLabel = document.getElementById('txQtyLabel');
+            const txUnitBadge = document.getElementById('txUnitBadge');
+            const txQtyInput = document.getElementById('txQtyInput');
+
+            function syncTxModalHints() {
+                const opt = txSelect?.options[txSelect.selectedIndex];
+                if (opt && txUnitBadge) {
+                    txUnitBadge.textContent = opt.dataset.unit || 'đv';
+                }
+                if (txType && txQtyLabel) {
+                    if (txType.value === 'Adjust') {
+                        txQtyLabel.innerHTML = 'Mức tồn thực tế mới <span class="text-danger">*</span>';
+                        if (opt && txQtyInput) txQtyInput.value = opt.dataset.stock || '0';
+                    } else {
+                        txQtyLabel.innerHTML = 'Số lượng <span class="text-danger">*</span>';
+                    }
+                }
+            }
+
+            txSelect?.addEventListener('change', syncTxModalHints);
+            txType?.addEventListener('change', syncTxModalHints);
+
+            document.getElementById('btnOpenTxModalDefault')?.addEventListener('click', () => {
+                if (txType) txType.value = 'Import';
+                syncTxModalHints();
+                txModal?.show();
+            });
+
+            document.querySelectorAll('.btn-quick-tx').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (txSelect) txSelect.value = btn.dataset.id;
+                    if (txType) txType.value = btn.dataset.type || 'Import';
+                    syncTxModalHints();
+                    txModal?.show();
+                });
+            });
+        })();
+    </script>
+}

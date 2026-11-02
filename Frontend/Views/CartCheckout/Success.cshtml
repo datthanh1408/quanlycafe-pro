@@ -1,0 +1,58 @@
+@model Order
+@{
+    ViewData["Title"] = "Đặt hàng thành công";
+    var store = ViewBag.Store as StoreSettingsDto ?? new StoreSettingsDto();
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 text-center bg-white">
+                <div class="mx-auto mb-3 rounded-circle bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center" style="width: 72px; height: 72px;">
+                    <i class="bi bi-check-lg display-5"></i>
+                </div>
+                <h1 class="h3 fw-bold font-display mb-2">Đặt hàng thành công!</h1>
+                <p class="text-secondary mb-3">
+                    Mã đơn hàng của bạn là <strong class="text-coffee fs-5">@Model.Code</strong>
+                </p>
+
+                <div class="p-3 rounded-3 bg-cream text-start small mb-4">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Hình thức nhận:</span>
+                        <strong>@Model.OrderType.GetDisplayName() @(Model.Table != null ? $"({Model.Table.Code})" : "")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Phương thức thanh toán:</span>
+                        <strong>@Model.PaymentMethod</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Tổng thanh toán:</span>
+                        <strong class="text-coffee fs-6">@FormatHelper.Vnd(Model.Total)</strong>
+                    </div>
+                </div>
+
+                @if (Model.PaymentMethod == "QR" && store.IsQrConfigured)
+                {
+                    <div class="border rounded-4 p-3 mb-4 bg-light">
+                        <h2 class="h6 fw-bold text-coffee mb-2"><i class="bi bi-qr-code-scan me-1"></i> Hướng dẫn Chuyển khoản QR</h2>
+                        <img src="@store.QrImageUrl" alt="Mã QR Chuyển khoản" class="img-fluid rounded-3 mb-2" style="max-height: 220px;" />
+                        <div class="small">
+                            <div>Ngân hàng: <strong>@store.BankName</strong></div>
+                            <div>Chủ tài khoản: <strong>@store.BankAccountHolder</strong> (@store.BankAccountNumber)</div>
+                            <div>Số tiền: <strong class="text-danger">@FormatHelper.Vnd(Model.Total)</strong></div>
+                            <div>Nội dung CK: <strong class="badge bg-dark fs-6">@Model.Code</strong></div>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex flex-wrap gap-2 justify-content-center">
+                    <a href="/orders/@Model.Code" class="btn btn-coffee px-4">
+                        <i class="bi bi-broadcast me-1"></i> Theo dõi tiến trình đơn
+                    </a>
+                    <a href="/menu" class="btn btn-outline-coffee px-4">Tiếp tục xem menu</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,22 @@
+@model (int Page, int TotalPages, string BaseQueryUrl)
+@if (Model.TotalPages > 1)
+{
+    var sep = Model.BaseQueryUrl.Contains('?') ? "&" : "?";
+    <nav aria-label="Phân trang dữ liệu" class="mt-3">
+        <ul class="pagination pagination-sm justify-content-end mb-0 flex-wrap">
+            <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                <a class="page-link" href="@($"{Model.BaseQueryUrl}{sep}page={Model.Page - 1}")" aria-label="Trang trước">&laquo;</a>
+            </li>
+            @for (int p = Math.Max(1, Model.Page - 2); p <= Math.Min(Model.TotalPages, Model.Page + 2); p++)
+            {
+                <li class="page-item @(p == Model.Page ? "active" : "")">
+                    <a class="page-link @(p == Model.Page ? "bg-coffee border-0 text-white" : "")" href="@($"{Model.BaseQueryUrl}{sep}page={p}")">@p</a>
+                </li>
+            }
+            <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                <a class="page-link" href="@($"{Model.BaseQueryUrl}{sep}page={Model.Page + 1}")" aria-label="Trang sau">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+}
+

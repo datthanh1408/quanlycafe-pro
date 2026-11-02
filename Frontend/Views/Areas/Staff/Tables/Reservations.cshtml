@@ -1,0 +1,189 @@
+@model StaffReservationsVm
+@{
+    ViewData["Title"] = "Quản lý lịch đặt bàn";
+    var currentUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-calendar-check-fill text-coffee me-2"></i>Quản lý lịch đặt bàn trước
+        </h4>
+        <div class="small text-muted">
+            Xác nhận giữ bàn cho khách, đón khách vào bàn mở POS ngay hoặc giải phóng bàn quá hạn giữ chỗ.
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge bg-warning text-dark px-3 py-2">
+            Chờ xác nhận: <strong>@Model.PendingCount</strong>
+        </span>
+        <span class="badge bg-primary px-3 py-2">
+            Đã xác nhận hôm nay: <strong>@Model.ConfirmedTodayCount</strong>
+        </span>
+        <a href="/staff/tables" class="btn btn-outline-coffee staff-touch-btn btn-sm">
+            <i class="bi bi-box-fill me-1"></i>Xem sơ đồ bàn 3D
+        </a>
+    </div>
+</div>
+
+<!-- Bộ lọc nhanh -->
+<div class="card card-coffee mb-3">
+    <div class="card-body py-3">
+        <form method="get" action="/staff/reservations" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold mb-1">Trạng thái đặt bàn</label>
+                <select name="status" class="form-select">
+                    <option value="">Tất cả trạng thái</option>
+                    @foreach (var st in Enum.GetValues<ReservationStatus>())
+                    {
+                        <option value="@st" selected="@(Model.CurrentStatus == st)">@st.GetDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold mb-1">Ngày khách đến</label>
+                <input type="date" name="date" value="@Model.DateFilter" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold mb-1">Tìm theo tên, SĐT hoặc mã bàn</label>
+                <input type="text" name="q" value="@Model.SearchKeyword" class="form-control" placeholder="VD: 0901..., Nguyễn Văn, T1-01..." />
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-coffee staff-touch-btn flex-grow-1">
+                    <i class="bi bi-funnel-fill me-1"></i>Lọc
+                </button>
+                <a href="/staff/reservations" class="btn btn-outline-secondary staff-touch-btn" title="Xóa bộ lọc">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Danh sách lịch đặt bàn -->
+<div class="card card-coffee">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Giờ hẹn</th>
+                    <th>Bàn &amp; Khu vực</th>
+                    <th>Khách hàng</th>
+                    <th>Số khách</th>
+                    <th>Ghi chú</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end pe-3">Thao tác vận hành</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Reservations.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+                            Chưa có lịch đặt bàn nào khớp bộ lọc hiện tại.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var r in Model.Reservations.Items)
+                    {
+                        var badgeClass = r.Status switch
+                        {
+                            ReservationStatus.Pending => "bg-warning text-dark",
+                            ReservationStatus.Confirmed => "bg-primary",
+                            ReservationStatus.Completed => "bg-success",
+                            ReservationStatus.Cancelled => "bg-secondary",
+                            _ => "bg-light text-dark"
+                        };
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-bold text-coffee">@FormatHelper.VnDateTime(r.ReservedAt)</div>
+                                <small class="text-muted">Đặt lúc @FormatHelper.VnDateTime(r.CreatedAt)</small>
+                            </td>
+                            <td>
+                                <a href="/staff/tables?selectedId=@r.TableId" class="fw-bold text-decoration-none text-dark">
+                                    <span class="badge bg-dark me-1">@r.TableCode</span>
+                                </a>
+                                <div class="small text-muted">@r.Zone • Tối đa @r.TableCapacity chỗ</div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">@r.CustomerName</div>
+                                <a href="tel:@r.Phone" class="small text-decoration-none">
+                                    <i class="bi bi-telephone me-1"></i>@r.Phone
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill bg-cream text-dark border px-3 py-2">
+                                    <i class="bi bi-people-fill me-1"></i>@r.PartySize người
+                                </span>
+                            </td>
+                            <td style="max-width: 240px;">
+                                @if (!string.IsNullOrWhiteSpace(r.Note))
+                                {
+                                    <span class="small fst-italic">"@r.Note"</span>
+                                }
+                                else
+                                {
+                                    <span class="small text-muted">---</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @badgeClass px-3 py-2">@r.Status.GetDisplayName()</span>
+                            </td>
+                            <td class="text-end pe-3">
+                                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                    @if (r.Status == ReservationStatus.Pending)
+                                    {
+                                        <form method="post" action="/staff/reservations/update-status" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <input type="hidden" name="newStatus" value="@ReservationStatus.Confirmed" />
+                                            <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                            <button type="submit" class="btn btn-sm btn-primary staff-touch-btn">
+                                                <i class="bi bi-check2-circle me-1"></i>Xác nhận giữ bàn
+                                            </button>
+                                        </form>
+                                    }
+
+                                    @if (r.Status is ReservationStatus.Pending or ReservationStatus.Confirmed)
+                                    {
+                                        <form method="post" action="/staff/reservations/update-status" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <input type="hidden" name="newStatus" value="@ReservationStatus.Completed" />
+                                            <input type="hidden" name="openPos" value="true" />
+                                            <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                            <button type="submit" class="btn btn-sm btn-success staff-touch-btn">
+                                                <i class="bi bi-cup-hot-fill me-1"></i>Khách đến &amp; Mở POS
+                                            </button>
+                                        </form>
+
+                                        <form method="post" action="/staff/reservations/update-status" class="d-inline"
+                                              onsubmit="return confirm('Xác nhận hủy lịch đặt bàn này?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <input type="hidden" name="newStatus" value="@ReservationStatus.Cancelled" />
+                                            <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger staff-touch-btn">
+                                                <i class="bi bi-x-lg"></i> Hủy
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card-footer bg-white">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml"
+                 model="(Model.Reservations.Page, Model.Reservations.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>
+

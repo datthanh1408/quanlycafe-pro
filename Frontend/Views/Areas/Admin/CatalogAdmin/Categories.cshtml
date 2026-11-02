@@ -1,0 +1,201 @@
+@using CoffeeShop.Areas.Admin.Models
+@model CategoriesAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Danh mục";
+    var isEditing = Model.Form.Id > 0;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-tags-fill me-2"></i>Danh mục Thực đơn</h4>
+        <div class="text-muted small">Quản lý nhóm đồ uống &amp; bánh ngọt. Không cho phép xóa danh mục đang chứa sản phẩm hoạt động.</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/products" class="btn btn-outline-coffee btn-sm">
+            <i class="bi bi-cup-straw me-1"></i>Quản lý Sản phẩm
+        </a>
+        @if (isEditing)
+        {
+            <a href="/admin/categories" class="btn btn-coffee btn-sm">
+                <i class="bi bi-plus-lg me-1"></i>Tạo danh mục mới
+            </a>
+        }
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Form Thêm / Sửa Danh mục -->
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi @(isEditing ? "bi-pencil-square text-warning" : "bi-plus-circle-fill text-coffee") me-2"></i>
+                    @(isEditing ? $"Chỉnh sửa: {Model.Form.Name}" : "Thêm Danh mục mới")
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/categories/save" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" value="@Model.Form.Id" />
+                    <input type="hidden" name="ExistingImageUrl" value="@Model.Form.ExistingImageUrl" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tên danh mục <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" value="@Model.Form.Name" required maxlength="100" placeholder="VD: Cà phê Truyền thống" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Slug URL <small class="text-muted fw-normal">(để trống tự sinh)</small></label>
+                        <input type="text" name="Slug" class="form-control font-monospace small" value="@Model.Form.Slug" maxlength="120" placeholder="ca-phe-truyen-thong" />
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label fw-semibold">Bootstrap Icon</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-cream text-coffee"><i id="iconPreview" class="bi @Model.Form.IconClass"></i></span>
+                                <input type="text" name="IconClass" id="iconInput" class="form-control" value="@Model.Form.IconClass" maxlength="80" placeholder="bi-cup-hot" />
+                            </div>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-semibold">Thứ tự hiển thị</label>
+                            <input type="number" name="DisplayOrder" class="form-control" value="@Model.Form.DisplayOrder" min="0" max="999" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Ảnh đại diện danh mục <small class="text-muted fw-normal">(tùy chọn)</small></label>
+                        <input type="file" name="ImageFile" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp" />
+                        @if (!string.IsNullOrWhiteSpace(Model.Form.ExistingImageUrl))
+                        {
+                            <div class="mt-2 d-flex align-items-center gap-2">
+                                <img src="@Model.Form.ExistingImageUrl" alt="Category" class="rounded border" style="width: 48px; height: 48px; object-fit: cover;" />
+                                <small class="text-muted">Ảnh hiện tại</small>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="catActiveSwitch" name="IsActive" value="true" checked="@Model.Form.IsActive" />
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="form-check-label fw-semibold" for="catActiveSwitch">Hiển thị trên thực đơn</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-coffee">
+                            <i class="bi bi-check2-circle me-1"></i>@(isEditing ? "Lưu cập nhật" : "Thêm danh mục")
+                        </button>
+                        @if (isEditing)
+                        {
+                            <a href="/admin/categories" class="btn btn-light border">Hủy chỉnh sửa</a>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bảng danh sách Danh mục -->
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Danh sách Danh mục (@Model.Categories.Count)</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Thứ tự</th>
+                            <th>Danh mục</th>
+                            <th>Slug</th>
+                            <th class="text-center">Số sản phẩm</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-end pe-3">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Categories.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">Chưa có danh mục nào.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var c in Model.Categories)
+                            {
+                                <tr>
+                                    <td class="ps-3">
+                                        <span class="badge bg-light text-dark border">#@c.DisplayOrder</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (!string.IsNullOrWhiteSpace(c.ImageUrl))
+                                            {
+                                                <img src="@c.ImageUrl" alt="@c.Name" class="rounded border" style="width: 38px; height: 38px; object-fit: cover;" />
+                                            }
+                                            else
+                                            {
+                                                <span class="rounded bg-cream text-coffee d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                                    <i class="bi @c.IconClass"></i>
+                                                </span>
+                                            }
+                                            <span class="fw-bold">@c.Name</span>
+                                        </div>
+                                    </td>
+                                    <td><code class="text-muted">@c.Slug</code></td>
+                                    <td class="text-center">
+                                        <a href="/admin/products?categoryId=@c.Id" class="badge rounded-pill bg-coffee text-decoration-none px-3 py-2">
+                                            @c.ProductCount món
+                                        </a>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (c.IsActive)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Đang hiển thị</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Tạm ẩn</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/admin/categories?editId=@c.Id" class="btn btn-sm btn-light border" title="Chỉnh sửa">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="/admin/categories/toggle/@c.Id" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border" title="@(c.IsActive ? "Tạm ẩn danh mục" : "Bật hiển thị")">
+                                                    <i class="bi @(c.IsActive ? "bi-eye-slash text-warning" : "bi-eye text-success")"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/admin/categories/delete/@c.Id" class="d-inline"
+                                                  onsubmit="return confirm('Xác nhận xóa danh mục &quot;@c.Name&quot;? Lưu ý: Không thể xóa nếu danh mục đang chứa sản phẩm.');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border text-danger" title="Xóa danh mục">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('iconInput')?.addEventListener('input', function () {
+            const preview = document.getElementById('iconPreview');
+            if (preview) {
+                preview.className = 'bi ' + (this.value.trim() || 'bi-cup-hot');
+            }
+        });
+    </script>
+}

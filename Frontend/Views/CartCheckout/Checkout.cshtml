@@ -1,0 +1,215 @@
+@model CheckoutPageVm
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Xác nhận Đặt hàng";
+    var tablesJson = JsonSerializer.Serialize(Model.Tables3D, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="container py-4 py-lg-5">
+    <h1 class="h3 fw-bold font-display mb-4">Hoàn tất Đặt hàng</h1>
+
+    <form method="post" action="/checkout" id="checkoutForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Form.IdempotencyToken" />
+        <input type="hidden" asp-for="Form.PromoCode" />
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+                    <h2 class="h5 fw-bold mb-3">1. Thông tin người đặt</h2>
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2"></div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-7">
+                            <label asp-for="Form.CustomerName" class="form-label small fw-semibold">Họ và tên *</label>
+                            <input asp-for="Form.CustomerName" class="form-control" />
+                            <span asp-validation-for="Form.CustomerName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-5">
+                            <label asp-for="Form.Phone" class="form-label small fw-semibold">Số điện thoại *</label>
+                            <input asp-for="Form.Phone" class="form-control" />
+                            <span asp-validation-for="Form.Phone" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <h2 class="h5 fw-bold mb-3">2. Hình thức nhận món</h2>
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-4">
+                            <input type="radio" class="btn-check chk-order-type" asp-for="Form.OrderType" id="otTakeAway" value="@OrderType.TakeAway" />
+                            <label class="btn btn-outline-coffee w-100 py-2" for="otTakeAway">
+                                <i class="bi bi-bag-check me-1"></i> Mang đi
+                            </label>
+                        </div>
+                        <div class="col-sm-4">
+                            <input type="radio" class="btn-check chk-order-type" asp-for="Form.OrderType" id="otDineIn" value="@OrderType.DineIn" />
+                            <label class="btn btn-outline-coffee w-100 py-2" for="otDineIn">
+                                <i class="bi bi-badge-3d me-1"></i> Tại quán (3D)
+                            </label>
+                        </div>
+                        <div class="col-sm-4">
+                            <input type="radio" class="btn-check chk-order-type" asp-for="Form.OrderType" id="otDelivery" value="@OrderType.Delivery" />
+                            <label class="btn btn-outline-coffee w-100 py-2" for="otDelivery">
+                                <i class="bi bi-bicycle me-1"></i> Giao hàng
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Chọn bàn trống trên Sơ đồ 3D khi chọn Tại quán -->
+                    <div id="dineIn3DSection" class="mb-3" style="display: none;">
+                        <label asp-for="Form.TableId" class="form-label small fw-semibold">Chọn bàn trống trên Sơ đồ 3D (Tùy chọn – màu xanh lá là bàn trống)</label>
+                        <select asp-for="Form.TableId" id="checkoutTableSelect" class="form-select mb-2">
+                            <option value="">-- Tự chọn bàn khi đến quán hoặc click bàn xanh trên 3D --</option>
+                            @foreach (var t in Model.Tables3D.Where(x => x.Status == TableStatus.Available))
+                            {
+                                <option value="@t.Id">@t.Code – @t.Zone (@t.Capacity chỗ) [Trống]</option>
+                            }
+                        </select>
+                        <div class="three-floorplan-stage" id="checkoutFloor3D" style="height: 340px;">
+                            <div id="checkoutFloorTooltip" class="three-tooltip"></div>
+                        </div>
+                    </div>
+
+                    <!-- Địa chỉ Giao hàng -->
+                    <div id="deliveryAddressSection" class="mb-3" style="display: none;">
+                        <label asp-for="Form.DeliveryAddress" class="form-label small fw-semibold">Địa chỉ nhận giao hàng *</label>
+                        <input asp-for="Form.DeliveryAddress" class="form-control" placeholder="Số nhà, tên đường, phường, quận..." />
+                        <span asp-validation-for="Form.DeliveryAddress" class="text-danger small"></span>
+                        <div class="form-text">
+                            Phí giao hàng: <strong>@FormatHelper.Vnd(Model.Store.ShippingFee)</strong> (Miễn phí cho đơn từ <strong>@FormatHelper.Vnd(Model.Store.FreeShippingThreshold)</strong>).
+                        </div>
+                    </div>
+
+                    <h2 class="h5 fw-bold mb-3 mt-4">3. Phương thức thanh toán</h2>
+                    <div class="d-grid gap-2 mb-3">
+                        @foreach (var pm in Model.PaymentMethods)
+                        {
+                            <label class="border rounded-3 p-3 d-flex align-items-center gap-3" style="cursor: pointer;">
+                                <input type="radio" asp-for="Form.PaymentMethod" value="@pm.Code" class="form-check-input m-0" />
+                                <div>
+                                    <strong class="d-block">@pm.Name</strong>
+                                    @if (pm.Code == "QR")
+                                    {
+                                        <small class="text-muted">Mã QR và nội dung chuyển khoản sẽ hiển thị ngay sau khi tạo đơn.</small>
+                                    }
+                                </div>
+                            </label>
+                        }
+                    </div>
+
+                    <div>
+                        <label asp-for="Form.Note" class="form-label small fw-semibold">Ghi chú đơn hàng</label>
+                        <textarea asp-for="Form.Note" rows="2" maxlength="200" class="form-control" placeholder="Ghi chú thêm cho quán..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style="top: 84px;">
+                    <h2 class="h5 fw-bold mb-3">Đơn hàng của bạn (@Model.Cart.TotalQuantity món)</h2>
+                    <div class="mb-3" style="max-height: 280px; overflow-y: auto;">
+                        @foreach (var item in Model.Cart.Items)
+                        {
+                            <div class="d-flex justify-content-between py-2 border-bottom small">
+                                <div>
+                                    <strong>@item.Quantity x @item.ProductName</strong>
+                                    @if (!string.IsNullOrWhiteSpace(item.SizeName))
+                                    {
+                                        <span class="text-muted">(@item.SizeName)</span>
+                                    }
+                                    @if (item.Toppings.Count > 0)
+                                    {
+                                        <div class="text-coffee">+ @string.Join(", ", item.Toppings.Select(t => t.Name))</div>
+                                    }
+                                </div>
+                                <strong class="ms-2 text-nowrap">@FormatHelper.Vnd(item.LineTotal)</strong>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between small mb-2">
+                        <span class="text-secondary">Tạm tính</span>
+                        <strong>@FormatHelper.Vnd(Model.Cart.Subtotal)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-2">
+                        <span class="text-secondary">Giảm giá @(Model.Cart.PromoValid ? $"({Model.Cart.PromoCode})" : "")</span>
+                        <strong class="text-success">@(Model.Cart.DiscountAmount > 0 ? $"-{FormatHelper.Vnd(Model.Cart.DiscountAmount)}" : "0 ₫")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-2">
+                        <span class="text-secondary">Phí giao hàng</span>
+                        <strong id="chkShippingText">@FormatHelper.Vnd(Model.Cart.ShippingFee)</strong>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <span class="fw-bold">Tổng thanh toán</span>
+                        <strong class="fs-4 text-coffee" id="chkTotalText">@FormatHelper.Vnd(Model.Cart.Total)</strong>
+                    </div>
+
+                    <button type="submit" id="btnPlaceOrder" class="btn btn-coffee btn-lg w-100">
+                        <i class="bi bi-check2-circle me-2"></i> Xác nhận Đặt hàng
+                    </button>
+                    <a href="/cart" class="btn btn-link text-coffee w-100 mt-2 text-decoration-none small">Quay lại chỉnh sửa giỏ hàng</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initFloorPlan3D } from '/js/three-floorplan.js';
+
+        const subtotalAfterDiscount = @(Model.Cart.Subtotal - Model.Cart.DiscountAmount);
+        const stdShipFee = @Model.Store.ShippingFee;
+        const freeShipThreshold = @Model.Store.FreeShippingThreshold;
+        const fmtVnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + ' ₫';
+
+        const dineInSec = document.getElementById('dineIn3DSection');
+        const delivSec = document.getElementById('deliveryAddressSection');
+        const shipEl = document.getElementById('chkShippingText');
+        const totalEl = document.getElementById('chkTotalText');
+        const tableSelect = document.getElementById('checkoutTableSelect');
+        let floor3D = null;
+
+        function syncOrderTypeUI() {
+            const val = document.querySelector('.chk-order-type:checked')?.value;
+            dineInSec.style.display = val === 'DineIn' ? 'block' : 'none';
+            delivSec.style.display = val === 'Delivery' ? 'block' : 'none';
+
+            if (val === 'DineIn' && !floor3D) {
+                setTimeout(() => {
+                    floor3D = initFloorPlan3D({
+                        containerId: 'checkoutFloor3D',
+                        tooltipId: 'checkoutFloorTooltip',
+                        tables: @Html.Raw(tablesJson),
+                        editable: false,
+                        onlySelectAvailable: true,
+                        onSelectTable: (tbl) => {
+                            if (tableSelect) tableSelect.value = String(tbl.id);
+                        }
+                    });
+                }, 60);
+            }
+
+            const ship = (val === 'Delivery' && subtotalAfterDiscount < freeShipThreshold) ? stdShipFee : 0;
+            shipEl.textContent = fmtVnd(ship);
+            totalEl.textContent = fmtVnd(Math.max(0, subtotalAfterDiscount + ship));
+        }
+
+        document.querySelectorAll('.chk-order-type').forEach(r => r.addEventListener('change', syncOrderTypeUI));
+        tableSelect?.addEventListener('change', () => {
+            const id = parseInt(tableSelect.value, 10);
+            if (id && floor3D) floor3D.selectTable(id);
+        });
+
+        document.getElementById('checkoutForm')?.addEventListener('submit', () => {
+            const btn = document.getElementById('btnPlaceOrder');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo đơn...';
+            }
+        });
+
+        syncOrderTypeUI();
+    </script>
+}
+

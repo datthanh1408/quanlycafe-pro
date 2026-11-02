@@ -1,0 +1,22 @@
+﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 340' width='400' height='340'>
+  <defs>
+    <linearGradient id='bg' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#7C2D12'/>
+      <stop offset='100%' stop-color='#C2410C'/>
+    </linearGradient>
+    <radialGradient id='glow' cx='50%' cy='45%' r='50%'>
+      <stop offset='0%' stop-color='rgba(255,245,230,0.28)'/>
+      <stop offset='100%' stop-color='rgba(255,245,230,0)'/>
+    </radialGradient>
+  </defs>
+  <rect width='400' height='340' fill='url(#bg)' rx='16'/>
+  <circle cx='200' cy='165' r='145' fill='url(#glow)'/>
+  
+                <ellipse cx='200' cy='248' rx='105' ry='18' fill='rgba(0,0,0,0.28)'/>
+                <ellipse cx='200' cy='235' rx='98' ry='22' fill='#F6EFE7' stroke='#D7C4B0' stroke-width='3'/>
+                <path d='M130 220 Q145 140 200 135 Q255 140 270 220 Q200 238 130 220 Z' fill='#EA580C' stroke='#FFF3E0' stroke-width='2'/>
+                <path d='M152 185 Q200 162 248 185' fill='none' stroke='#FFF8E7' stroke-width='5' stroke-linecap='round' opacity='0.7'/>
+                <circle cx='200' cy='135' r='10' fill='#DC2626'/>
+  <text x='200' y='300' text-anchor='middle' fill='#FFFDF9' font-family='Segoe UI, sans-serif' font-size='17' font-weight='700'>B&#225;nh M&#236; Que Pate Cột Đ&#232;n</text>
+  <text x='200' y='321' text-anchor='middle' fill='rgba(255,246,235,0.8)' font-family='Segoe UI, sans-serif' font-size='12'>Gi&#242;n n&#243;ng thơm lừng</text>
+</svg>

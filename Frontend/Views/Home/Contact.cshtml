@@ -1,0 +1,86 @@
+@model StoreSettingsDto
+@{
+    ViewData["Title"] = "Liên hệ";
+}
+
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <span class="text-accent fw-bold small text-uppercase">Kết nối cùng @Model.ShopName</span>
+        <h1 class="h2 fw-bold font-display">Thông tin Liên hệ &amp; Giờ mở cửa</h1>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white">
+                <h2 class="h5 fw-bold mb-4">Ghé thăm quán</h2>
+                <div class="d-grid gap-3">
+                    <div class="d-flex gap-3">
+                        <span class="rounded-3 bg-cream text-coffee d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="bi bi-geo-alt-fill fs-5"></i>
+                        </span>
+                        <div>
+                            <strong class="d-block">Địa chỉ</strong>
+                            <span class="text-secondary">@Model.Address</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="rounded-3 bg-cream text-coffee d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="bi bi-clock-fill fs-5"></i>
+                        </span>
+                        <div>
+                            <strong class="d-block">Giờ hoạt động</strong>
+                            <span class="text-secondary">@Model.OpeningHours</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="rounded-3 bg-cream text-coffee d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="bi bi-telephone-fill fs-5"></i>
+                        </span>
+                        <div>
+                            <strong class="d-block">Hotline hỗ trợ</strong>
+                            <span class="text-secondary">@Model.Phone</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="rounded-3 bg-cream text-coffee d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="bi bi-envelope-fill fs-5"></i>
+                        </span>
+                        <div>
+                            <strong class="d-block">Email</strong>
+                            <span class="text-secondary">@Model.Email</span>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.FacebookUrl) || !string.IsNullOrWhiteSpace(Model.ZaloUrl))
+                {
+                    <hr class="my-4" />
+                    <div class="d-flex gap-2">
+                        @if (!string.IsNullOrWhiteSpace(Model.FacebookUrl))
+                        {
+                            <a href="@Model.FacebookUrl" target="_blank" rel="noopener" class="btn btn-outline-coffee">
+                                <i class="bi bi-facebook me-1"></i> Fanpage Facebook
+                            </a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.ZaloUrl))
+                        {
+                            <a href="@Model.ZaloUrl" target="_blank" rel="noopener" class="btn btn-outline-coffee">
+                                <i class="bi bi-chat-dots-fill me-1"></i> Chat Zalo OA
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.GoogleMapsEmbedUrl))
+        {
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                    <iframe src="@Model.GoogleMapsEmbedUrl" style="border:0; min-height: 360px; width: 100%; height: 100%;" allowfullscreen loading="lazy"></iframe>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+

@@ -1,0 +1,155 @@
+@model CartSummaryDto
+@{
+    ViewData["Title"] = "Giỏ hàng";
+}
+
+<div class="container py-4 py-lg-5">
+    <h1 class="h3 fw-bold font-display mb-4">Giỏ hàng của bạn</h1>
+
+    @if (Model.Items.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+            <i class="bi bi-bag-x display-3 text-muted mb-3"></i>
+            <h2 class="h5 fw-bold">Giỏ hàng đang trống</h2>
+            <p class="text-muted small mb-4">Hãy khám phá thực đơn cà phê rang mộc, trà trái cây tươi và bánh ngọt nướng mới nhé!</p>
+            <div>
+                <a href="/menu" class="btn btn-coffee px-4">
+                    <i class="bi bi-cup-hot-fill me-2"></i> Tiếp tục chọn món
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (Model.HasUnavailableItems)
+        {
+            <div class="alert alert-warning d-flex align-items-center gap-2 rounded-3">
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                <span>Một số món trong giỏ vừa chuyển sang trạng thái <strong>Tạm hết</strong>. Vui lòng xóa món tạm hết trước khi đặt hàng.</span>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
+                    @foreach (var item in Model.Items)
+                    {
+                        var opts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(item.SizeName)) opts.Add($"Size {item.SizeName}");
+                        if (!string.IsNullOrWhiteSpace(item.Temperature)) opts.Add(item.Temperature);
+                        if (!string.IsNullOrWhiteSpace(item.SugarLevel)) opts.Add($"Đường {item.SugarLevel}");
+                        if (!string.IsNullOrWhiteSpace(item.IceLevel)) opts.Add($"Đá {item.IceLevel}");
+
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 py-3 border-bottom @(!item.IsAvailable ? "opacity-50" : "")">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="@item.ImageUrl" alt="@item.ProductName" class="rounded-3 object-fit-cover" style="width: 74px; height: 74px;" />
+                                <div>
+                                    <h3 class="h6 fw-bold mb-1">
+                                        <a href="/product/@item.ProductId" class="text-dark text-decoration-none">@item.ProductName</a>
+                                        @if (!item.IsAvailable)
+                                        {
+                                            <span class="badge bg-danger ms-1">Tạm hết</span>
+                                        }
+                                    </h3>
+                                    @if (opts.Count > 0)
+                                    {
+                                        <div class="small text-muted">@string.Join(" • ", opts)</div>
+                                    }
+                                    @if (item.Toppings.Count > 0)
+                                    {
+                                        <div class="small text-coffee">+ @string.Join(", ", item.Toppings.Select(t => t.Name))</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Note))
+                                    {
+                                        <div class="small fst-italic text-secondary">"@item.Note"</div>
+                                    }
+                                    <div class="small text-muted mt-1">Đơn giá: @FormatHelper.Vnd(item.UnitPrice)</div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-3 ms-auto">
+                                <form method="post" action="/cart/update" class="d-inline-flex align-items-center">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="lineId" value="@item.LineId" />
+                                    <div class="input-group input-group-sm" style="width: 112px;">
+                                        <button type="submit" name="quantity" value="@(item.Quantity - 1)" class="btn btn-outline-secondary">-</button>
+                                        <span class="form-control text-center fw-bold">@item.Quantity</span>
+                                        <button type="submit" name="quantity" value="@(item.Quantity + 1)" class="btn btn-outline-secondary">+</button>
+                                    </div>
+                                </form>
+
+                                <strong class="text-coffee text-end" style="min-width: 95px;">@FormatHelper.Vnd(item.LineTotal)</strong>
+
+                                <form method="post" action="/cart/remove" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="lineId" value="@item.LineId" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa món" aria-label="Xóa @item.ProductName">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="pt-3 d-flex justify-content-between">
+                        <a href="/menu" class="btn btn-outline-coffee">
+                            <i class="bi bi-arrow-left me-1"></i> Tiếp tục mua hàng
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                    <h2 class="h5 fw-bold mb-3">Tóm tắt đơn hàng</h2>
+
+                    <!-- Mã giảm giá kiểm tra thật qua PromotionService -->
+                    <form method="post" action="/cart/apply-promo" class="mb-3">
+                        @Html.AntiForgeryToken()
+                        <label class="form-label small fw-semibold">Mã khuyến mãi</label>
+                        <div class="input-group">
+                            <input type="text" name="promoCode" value="@Model.PromoCode" class="form-control text-uppercase" placeholder="VD: DATMOC15" />
+                            <button type="submit" class="btn btn-outline-coffee">Áp dụng</button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.PromoMessage))
+                        {
+                            <div class="small mt-1 @(Model.PromoValid ? "text-success" : "text-danger")">@Model.PromoMessage</div>
+                        }
+                    </form>
+
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span class="text-secondary">Tạm tính (@Model.TotalQuantity món)</span>
+                        <strong>@FormatHelper.Vnd(Model.Subtotal)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 small">
+                        <span class="text-secondary">Giảm giá</span>
+                        <strong class="text-success">@(Model.DiscountAmount > 0 ? $"-{FormatHelper.Vnd(Model.DiscountAmount)}" : "0 ₫")</strong>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <span class="fw-bold">Tổng cộng</span>
+                        <strong class="fs-4 text-coffee">@FormatHelper.Vnd(Model.Total)</strong>
+                    </div>
+
+                    @if (Model.HasUnavailableItems)
+                    {
+                        <button type="button" class="btn btn-secondary w-100" disabled>Vui lòng xóa món tạm hết</button>
+                    }
+                    else if (User.Identity?.IsAuthenticated != true)
+                    {
+                        <a href="/login?returnUrl=/checkout" class="btn btn-coffee w-100">
+                            <i class="bi bi-person-lock me-2"></i> Đăng nhập để Đặt hàng
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="/checkout" class="btn btn-coffee w-100">
+                            Tiến hành Đặt hàng <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+

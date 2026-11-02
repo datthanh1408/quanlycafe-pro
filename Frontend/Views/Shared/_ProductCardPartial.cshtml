@@ -1,0 +1,69 @@
+@model ProductCardVm
+<div class="product-card @(!Model.IsAvailable ? "is-unavailable" : "")">
+    <a href="/product/@Model.Id" class="product-card-img-wrap text-decoration-none d-block">
+        <img src="@Model.ImageUrl" alt="@Model.Name" loading="lazy" />
+        @if (Model.IsFeatured && Model.IsAvailable)
+        {
+            <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2 shadow-sm">
+                <i class="bi bi-stars me-1"></i>Nổi bật
+            </span>
+        }
+        @if (!Model.IsAvailable)
+        {
+            <div class="unavailable-overlay">
+                <span class="badge bg-danger px-3 py-2 fs-6 shadow">Tạm hết</span>
+            </div>
+        }
+    </a>
+    <div class="p-3 d-flex flex-column flex-grow-1 justify-content-between">
+        <div>
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="text-muted small">@Model.CategoryName</span>
+                @if (Model.SoldCount > 0)
+                {
+                    <span class="text-muted" style="font-size: 0.74rem;"><i class="bi bi-fire text-warning"></i> Đã bán @Model.SoldCount</span>
+                }
+            </div>
+            <h3 class="h6 fw-bold mb-1">
+                <a href="/product/@Model.Id" class="text-dark text-decoration-none">@Model.Name</a>
+            </h3>
+            <p class="text-muted small mb-3" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                @(Model.Description ?? "Thưởng thức hương vị tinh tuyển chuẩn Đạt Mộc Coffee.")
+            </p>
+        </div>
+
+        <div class="pt-2 border-top d-flex align-items-center justify-content-between gap-2">
+            <div>
+                <span class="fw-bold text-coffee fs-6">@FormatHelper.Vnd(Model.DisplayPrice)</span>
+                @if (!string.IsNullOrWhiteSpace(Model.DefaultSizeName))
+                {
+                    <small class="text-muted d-block" style="font-size: 0.7rem;">Từ size @Model.DefaultSizeName</small>
+                }
+            </div>
+
+            <div class="d-flex gap-1">
+                <a href="/product/@Model.Id" class="btn btn-sm btn-outline-coffee px-2" title="Tùy chỉnh 3D &amp; Xem chi tiết" style="min-height: 38px;">
+                    <i class="bi bi-box me-1"></i>3D
+                </a>
+                @if (Model.IsAvailable)
+                {
+                    <form method="post" action="/cart/add" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="productId" value="@Model.Id" />
+                        <input type="hidden" name="sizeName" value="@Model.DefaultSizeName" />
+                        <input type="hidden" name="quantity" value="1" />
+                        <input type="hidden" name="returnUrl" value="@(Context.Request.Path + Context.Request.QueryString)" />
+                        <button type="submit" class="btn btn-sm btn-coffee px-3" style="min-height: 38px;" aria-label="Thêm @Model.Name vào giỏ">
+                            <i class="bi bi-bag-plus-fill me-1"></i> Đặt
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-secondary px-2" disabled style="min-height: 38px;">Tạm hết</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+

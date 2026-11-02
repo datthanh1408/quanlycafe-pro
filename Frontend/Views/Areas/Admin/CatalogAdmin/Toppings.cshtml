@@ -1,0 +1,143 @@
+@using CoffeeShop.Areas.Admin.Models
+@model ToppingsAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Topping";
+    var isEditing = Model.Form.Id > 0;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-plus-circle-dotted me-2"></i>Quản lý Topping</h4>
+        <div class="text-muted small">Thiết lập các loại topping bán kèm đồ uống (trân châu, thạch, kem phô mai Macchiato, shot Espresso...).</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/products" class="btn btn-outline-coffee btn-sm">
+            <i class="bi bi-cup-straw me-1"></i>Gán vào Sản phẩm
+        </a>
+        @if (isEditing)
+        {
+            <a href="/admin/toppings" class="btn btn-coffee btn-sm">
+                <i class="bi bi-plus-lg me-1"></i>Thêm Topping mới
+            </a>
+        }
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Form Thêm / Sửa Topping -->
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi @(isEditing ? "bi-pencil-square text-warning" : "bi-plus-circle-fill text-coffee") me-2"></i>
+                    @(isEditing ? $"Sửa Topping: {Model.Form.Name}" : "Thêm Topping mới")
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/toppings/save">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" value="@Model.Form.Id" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tên Topping <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" value="@Model.Form.Name" required maxlength="100" placeholder="VD: Kem phô mai Macchiato" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Đơn giá cộng thêm (₫) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" name="Price" class="form-control" value="@Model.Form.Price.ToString("0")" required min="1000" step="1000" />
+                            <span class="input-group-text">₫</span>
+                        </div>
+                        <div class="form-text">Giá topping bắt buộc lớn hơn 0 ₫.</div>
+                    </div>
+
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="topActiveSwitch" name="IsActive" value="true" checked="@Model.Form.IsActive" />
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="form-check-label fw-semibold" for="topActiveSwitch">Đang kinh doanh</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-coffee">
+                            <i class="bi bi-check2-circle me-1"></i>@(isEditing ? "Lưu cập nhật" : "Thêm Topping")
+                        </button>
+                        @if (isEditing)
+                        {
+                            <a href="/admin/toppings" class="btn btn-light border">Hủy chỉnh sửa</a>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danh sách Topping -->
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0">Danh sách Topping (@Model.Toppings.Count)</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Tên Topping</th>
+                            <th class="text-end">Giá bán kèm</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-end pe-3">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Toppings.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">Chưa có topping nào.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var t in Model.Toppings)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-semibold">@t.Name</td>
+                                    <td class="text-end fw-bold text-coffee">+@FormatHelper.Vnd(t.Price)</td>
+                                    <td class="text-center">
+                                        @if (t.IsActive)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Đang bán</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Tạm ngưng</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/admin/toppings?editId=@t.Id" class="btn btn-sm btn-light border" title="Chỉnh sửa">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="/admin/toppings/toggle/@t.Id" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border" title="@(t.IsActive ? "Tạm ngưng" : "Mở bán lại")">
+                                                    <i class="bi @(t.IsActive ? "bi-pause-circle text-warning" : "bi-play-circle text-success")"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/admin/toppings/delete/@t.Id" class="d-inline"
+                                                  onsubmit="return confirm('Xác nhận xóa topping &quot;@t.Name&quot;?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border text-danger" title="Xóa topping">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,67 @@
+@model PagedResult<Order>
+@{
+    ViewData["Title"] = "Đơn hàng của tôi";
+    OrderStatus? filterStatus = ViewBag.FilterStatus;
+    var baseQuery = $"/orders?status={filterStatus}";
+}
+
+<div class="container py-4 py-lg-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <h1 class="h3 fw-bold font-display mb-0">Đơn hàng của tôi</h1>
+        <a href="/menu" class="btn btn-coffee btn-sm px-3"><i class="bi bi-plus-lg me-1"></i> Đặt đơn mới</a>
+    </div>
+
+    <!-- Bộ lọc theo trạng thái -->
+    <div class="d-flex flex-wrap gap-1 mb-4">
+        <a href="/orders" class="btn btn-sm rounded-pill px-3 @(filterStatus == null ? "btn-coffee" : "btn-outline-secondary")">Tất cả</a>
+        @foreach (var st in Enum.GetValues<OrderStatus>())
+        {
+            <a href="/orders?status=@st" class="btn btn-sm rounded-pill px-3 @(filterStatus == st ? "btn-coffee" : "btn-outline-secondary")">
+                @st.GetDisplayName()
+            </a>
+        }
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+            <i class="bi bi-receipt display-4 text-muted mb-3"></i>
+            <h2 class="h5 fw-bold">Chưa có đơn hàng nào</h2>
+            <p class="text-muted small mb-3">Các đơn hàng bạn đặt sẽ hiển thị đầy đủ tiến trình pha chế tại đây.</p>
+            <div><a href="/menu" class="btn btn-coffee px-4">Khám phá thực đơn</a></div>
+        </div>
+    }
+    else
+    {
+        <div class="d-grid gap-3">
+            @foreach (var o in Model.Items)
+            {
+                <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <a href="/orders/@o.Code" class="fw-bold text-coffee fs-5 text-decoration-none">@o.Code</a>
+                            <span class="text-muted small ms-2"><i class="bi bi-clock me-1"></i>@FormatHelper.DateTimeVn(o.CreatedAt)</span>
+                        </div>
+                        <partial name="_StatusBadge" model="o.Status" />
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top small">
+                        <div class="text-secondary">
+                            <span>@o.OrderType.GetDisplayName() @(o.Table != null ? $"• Bàn {o.Table.Code}" : "")</span>
+                            <span class="mx-1">•</span>
+                            <span>@o.Items.Sum(i => i.Quantity) món</span>
+                            <span class="mx-1">•</span>
+                            <span>@o.PaymentStatus.GetDisplayName()</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <strong class="fs-6 text-coffee">@FormatHelper.Vnd(o.Total)</strong>
+                            <a href="/orders/@o.Code" class="btn btn-sm btn-outline-coffee px-3">Chi tiết</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <partial name="_Pagination" model="(Model.Page, Model.TotalPages, baseQuery)" />
+    }
+</div>
+

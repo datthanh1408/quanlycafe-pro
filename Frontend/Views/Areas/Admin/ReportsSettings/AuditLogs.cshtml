@@ -1,0 +1,135 @@
+@using CoffeeShop.Areas.Admin.Models
+@model AuditLogsAdminViewModel
+@{
+    ViewData["Title"] = "Nhật ký Hoạt động (Audit Logs)";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-journal-code me-2"></i>Nhật ký Hoạt động &amp; Kiểm toán Bảo mật</h4>
+        <div class="text-muted small">Theo dõi lịch sử thao tác nhạy cảm: đổi giá sản phẩm, hủy/hoàn tiền đơn hàng, phân quyền nhân sự, điều chỉnh kho và cấu hình hệ thống.</div>
+    </div>
+</div>
+
+<!-- Bộ lọc Nhật ký -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" action="/admin/audit-logs" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold mb-1">Email người thực hiện</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                    <input type="text" name="userEmail" class="form-control" value="@Model.UserEmail" placeholder="VD: admin@@coffee.local" />
+                </div>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <label class="form-label small fw-semibold mb-1">Hành động (Action)</label>
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">-- Tất cả hành động --</option>
+                    @foreach (var act in Model.DistinctActions)
+                    {
+                        <option value="@act" selected="@(Model.Action == act)">@act</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Từ ngày</label>
+                <input type="date" name="fromDate" class="form-control form-control-sm" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Đến ngày</label>
+                <input type="date" name="toDate" class="form-control form-control-sm" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-coffee flex-grow-1" style="min-height: 32px;" title="Lọc">
+                    <i class="bi bi-funnel"></i>
+                </button>
+                <a href="/admin/audit-logs" class="btn btn-sm btn-light border" style="min-height: 32px;" title="Đặt lại">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bảng Nhật ký AuditLog -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Tổng số: @Model.PagedLogs.TotalItems bản ghi kiểm toán</span>
+        <span class="small text-muted">Trang @Model.PagedLogs.Page / @Model.PagedLogs.TotalPages</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width: 150px;">Thời gian (VN)</th>
+                    <th style="width: 190px;">Tài khoản / IP</th>
+                    <th style="width: 170px;">Hành động</th>
+                    <th style="width: 150px;">Đối tượng</th>
+                    <th>Giá trị cũ &rarr; Giá trị mới</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.PagedLogs.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-5">Không có bản ghi nhật ký hoạt động nào khớp bộ lọc.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var log in Model.PagedLogs.Items)
+                    {
+                        <tr>
+                            <td class="ps-3 small text-muted">@FormatHelper.DateTimeVn(log.CreatedAt, "dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="small">
+                                <div class="fw-semibold">@(string.IsNullOrWhiteSpace(log.UserEmail) ? "System" : log.UserEmail)</div>
+                                @if (!string.IsNullOrWhiteSpace(log.IpAddress))
+                                {
+                                    <code class="text-muted" style="font-size: 0.75rem;">@log.IpAddress</code>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge bg-cream text-coffee border font-monospace">@log.Action</span>
+                            </td>
+                            <td class="small">
+                                <span class="fw-semibold">@log.EntityName</span>
+                                @if (!string.IsNullOrWhiteSpace(log.EntityId))
+                                {
+                                    <span class="text-muted">(#@log.EntityId)</span>
+                                }
+                            </td>
+                            <td class="small py-2">
+                                @if (!string.IsNullOrWhiteSpace(log.OldValues))
+                                {
+                                    <div class="mb-1">
+                                        <span class="badge bg-secondary-subtle text-secondary me-1">Cũ</span>
+                                        <code class="text-secondary text-break">@log.OldValues</code>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(log.NewValues))
+                                {
+                                    <div>
+                                        <span class="badge bg-success-subtle text-success me-1">Mới</span>
+                                        <code class="text-dark text-break">@log.NewValues</code>
+                                    </div>
+                                }
+                                @if (string.IsNullOrWhiteSpace(log.OldValues) && string.IsNullOrWhiteSpace(log.NewValues))
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-0 pb-3">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.PagedLogs.Page, Model.PagedLogs.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>

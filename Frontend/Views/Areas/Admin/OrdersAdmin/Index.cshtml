@@ -1,0 +1,206 @@
+@using CoffeeShop.Areas.Admin.Models
+@model OrdersAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Đơn hàng";
+
+    var exportQs = new List<string>();
+    if (Model.FromDate.HasValue) exportQs.Add($"fromDate={Model.FromDate.Value:yyyy-MM-dd}");
+    if (Model.ToDate.HasValue) exportQs.Add($"toDate={Model.ToDate.Value:yyyy-MM-dd}");
+    if (Model.Status.HasValue) exportQs.Add($"status={Model.Status.Value}");
+    var exportExcelUrl = exportQs.Count > 0
+        ? $"/admin/orders/export-excel?{string.Join("&", exportQs)}"
+        : "/admin/orders/export-excel";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-receipt-cutoff me-2"></i>Quản lý Đơn hàng Toàn hệ thống</h4>
+        <div class="text-muted small">Tra cứu, lọc đa tiêu chí, điều phối quy trình pha chế, lùi bước trạng thái (Admin Rollback), hoàn tiền (Void) và xuất Excel.</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="@exportExcelUrl" class="btn btn-success fw-semibold px-3" style="min-height: 42px;">
+            <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất danh sách Excel (.xlsx)
+        </a>
+        <a href="/staff/pos" class="btn btn-coffee px-3" style="min-height: 42px;">
+            <i class="bi bi-calculator me-1"></i>Tạo đơn POS mới
+        </a>
+    </div>
+</div>
+
+<!-- Bộ lọc Server-side -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" action="/admin/orders" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4 col-xl-3">
+                <label class="form-label small fw-semibold mb-1">Tìm mã đơn / Khách / SĐT</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" value="@Model.Search" placeholder="CF-..., Tên, 09..." />
+                </div>
+            </div>
+
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label small fw-semibold mb-1">Trạng thái đơn</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var st in Enum.GetValues<OrderStatus>())
+                    {
+                        <option value="@st" selected="@(Model.Status == st)">@st.GetDisplayName()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label small fw-semibold mb-1">TT Thanh toán</label>
+                <select name="paymentStatus" class="form-select form-select-sm">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var ps in Enum.GetValues<PaymentStatus>())
+                    {
+                        <option value="@ps" selected="@(Model.PaymentStatus == ps)">@ps.GetDisplayName()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-3 col-xl-1">
+                <label class="form-label small fw-semibold mb-1">Hình thức</label>
+                <select name="orderType" class="form-select form-select-sm">
+                    <option value="">Tất cả</option>
+                    @foreach (var ot in Enum.GetValues<OrderType>())
+                    {
+                        <option value="@ot" selected="@(Model.OrderType == ot)">@ot.GetDisplayName()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-3 col-xl-2">
+                <label class="form-label small fw-semibold mb-1">Nhân viên xử lý</label>
+                <select name="staffId" class="form-select form-select-sm">
+                    <option value="">-- Mọi nhân viên --</option>
+                    @foreach (var stf in Model.StaffMembers)
+                    {
+                        <option value="@stf.Id" selected="@(Model.StaffId == stf.Id)">@stf.FullName</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-6 col-md-2 col-xl-1">
+                <label class="form-label small fw-semibold mb-1">Từ ngày</label>
+                <input type="date" name="fromDate" class="form-control form-control-sm" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+
+            <div class="col-6 col-md-2 col-xl-1">
+                <label class="form-label small fw-semibold mb-1">Đến ngày</label>
+                <input type="date" name="toDate" class="form-control form-control-sm" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+            </div>
+
+            <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+                <a href="/admin/orders" class="btn btn-sm btn-light border">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Xóa bộ lọc
+                </a>
+                <button type="submit" class="btn btn-sm btn-coffee px-4" style="min-height: 36px;">
+                    <i class="bi bi-funnel-fill me-1"></i>Áp dụng lọc
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bảng đơn hàng -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Tìm thấy @Model.PagedOrders.TotalItems đơn hàng</span>
+        <span class="small text-muted">Trang @Model.PagedOrders.Page / @Model.PagedOrders.TotalPages</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Mã đơn</th>
+                    <th>Thời gian (VN)</th>
+                    <th>Khách hàng</th>
+                    <th>Hình thức / Bàn</th>
+                    <th>Nhân viên</th>
+                    <th class="text-center">Số món</th>
+                    <th>Thanh toán</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Tổng tiền</th>
+                    <th class="text-end pe-3">Chi tiết</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.PagedOrders.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            Không có đơn hàng nào khớp điều kiện tìm kiếm.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var o in Model.PagedOrders.Items)
+                    {
+                        <tr>
+                            <td class="ps-3">
+                                <a href="/admin/orders/detail/@o.Id" class="fw-bold text-coffee text-decoration-none">@o.Code</a>
+                                <div><small class="badge bg-light text-muted border">@o.Source.GetDisplayName()</small></div>
+                            </td>
+                            <td class="small">@FormatHelper.DateTimeVn(o.CreatedAt)</td>
+                            <td>
+                                <div class="fw-semibold">@o.CustomerName</div>
+                                @if (!string.IsNullOrWhiteSpace(o.Phone))
+                                {
+                                    <div class="small text-muted">@o.Phone</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">@o.OrderType.GetDisplayName()</span>
+                                @if (o.Table != null)
+                                {
+                                    <div class="mt-1"><span class="badge bg-cream text-coffee border">Bàn @o.Table.Code</span></div>
+                                }
+                            </td>
+                            <td class="small">@(o.Staff?.FullName ?? "-")</td>
+                            <td class="text-center fw-semibold">@o.Items.Sum(i => i.Quantity)</td>
+                            <td>
+                                <div class="small fw-bold">@o.PaymentMethod</div>
+                                @if (o.PaymentStatus == PaymentStatus.Paid)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Đã thanh toán</span>
+                                }
+                                else if (o.PaymentStatus == PaymentStatus.Refunded)
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border">Đã hoàn tiền</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning-subtle text-dark border border-warning-subtle">Chưa thanh toán</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="order-status-badge" style="background-color: @o.Status.GetBadgeColor()">
+                                    <i class="bi @o.Status.GetStatusIcon()"></i> @o.Status.GetDisplayName()
+                                </span>
+                            </td>
+                            <td class="text-end fw-bold text-coffee">@FormatHelper.Vnd(o.Total)</td>
+                            <td class="text-end pe-3">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/admin/orders/detail/@o.Id" class="btn btn-sm btn-outline-coffee" style="min-height: 34px;">
+                                        Chi tiết
+                                    </a>
+                                    <a href="/staff/orders/receipt/@o.Id" target="_blank" class="btn btn-sm btn-light border" title="In hóa đơn">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-0 pb-3">
+        <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.PagedOrders.Page, Model.PagedOrders.TotalPages, Model.BaseQueryUrl)" />
+    </div>
+</div>

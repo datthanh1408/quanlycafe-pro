@@ -1,0 +1,266 @@
+@using CoffeeShop.Areas.Admin.Models
+@model PromotionsAdminViewModel
+@{
+    ViewData["Title"] = "Quản lý Mã Khuyến mãi";
+    var isEditing = Model.Form.Id > 0;
+    var nowUtc = DateTime.UtcNow;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-ticket-perforated-fill me-2"></i>Chương trình Khuyến mãi &amp; Voucher</h4>
+        <div class="text-muted small">Thiết lập mã giảm giá theo phần trăm (%) hoặc số tiền cố định (₫), giới hạn lượt dùng và tự động kiểm soát thời hạn.</div>
+    </div>
+    @if (isEditing)
+    {
+        <a href="/admin/promotions" class="btn btn-coffee btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Tạo mã khuyến mãi mới
+        </a>
+    }
+</div>
+
+<div class="row g-4">
+    <!-- Cột trái: Form Thêm / Sửa Mã khuyến mãi -->
+    <div class="col-12 col-xl-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0">
+                    <i class="bi @(isEditing ? "bi-pencil-square text-warning" : "bi-plus-circle-fill text-coffee") me-2"></i>
+                    @(isEditing ? $"Sửa Mã: {Model.Form.Code}" : "Tạo Mã Khuyến mãi mới")
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/promotions/save">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" value="@Model.Form.Id" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Mã Voucher (In hoa, A-Z, 0-9, -) <span class="text-danger">*</span></label>
+                        <input type="text" name="Code" class="form-control text-uppercase fw-bold font-monospace"
+                               value="@Model.Form.Code" required maxlength="40" pattern="[A-Za-z0-9\-]+"
+                               placeholder="VD: DATMOC-20" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tên chương trình <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" value="@Model.Form.Name" required maxlength="150" placeholder="VD: Ưu đãi khai trương giảm 20%" />
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Hình thức giảm</label>
+                            <select name="Type" id="promoTypeSelect" class="form-select">
+                                <option value="Percentage" selected="@(Model.Form.Type == PromotionType.Percentage)">Phần trăm (%)</option>
+                                <option value="FixedAmount" selected="@(Model.Form.Type == PromotionType.FixedAmount)">Số tiền (₫)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold" id="promoValueLabel">Giá trị giảm <span class="text-danger">*</span></label>
+                            <input type="number" name="Value" id="promoValueInput" class="form-control fw-bold"
+                                   value="@Model.Form.Value.ToString("0")" min="1" required />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6" id="maxDiscountWrap">
+                            <label class="form-label fw-semibold small">Giảm tối đa (₫)</label>
+                            <input type="number" name="MaxDiscount" class="form-control form-control-sm"
+                                   value="@(Model.Form.MaxDiscount?.ToString("0"))" min="0" step="1000" placeholder="Không giới hạn" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Đơn tối thiểu (₫)</label>
+                            <input type="number" name="MinOrderValue" class="form-control form-control-sm"
+                                   value="@Model.Form.MinOrderValue.ToString("0")" min="0" step="1000" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">Bắt đầu áp dụng (Giờ VN) <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="StartAt" class="form-control form-control-sm"
+                                   value="@Model.Form.StartAt.ToString("yyyy-MM-ddTHH:mm")" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">Kết thúc hiệu lực (Giờ VN) <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="EndAt" class="form-control form-control-sm"
+                                   value="@Model.Form.EndAt.ToString("yyyy-MM-ddTHH:mm")" required />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Tổng lượt tối đa</label>
+                            <input type="number" name="UsageLimit" class="form-control form-control-sm" value="@Model.Form.UsageLimit" min="1" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Lượt / mỗi khách</label>
+                            <input type="number" name="PerUserLimit" class="form-control form-control-sm" value="@Model.Form.PerUserLimit" min="1" required />
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" role="switch" id="promoActiveSwitch" name="IsActive" value="true" checked="@Model.Form.IsActive" />
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="form-check-label fw-semibold" for="promoActiveSwitch">Kích hoạt áp dụng</label>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-coffee">
+                            <i class="bi bi-check2-circle me-1"></i>@(isEditing ? "Lưu cập nhật Mã" : "Tạo Mã Khuyến mãi")
+                        </button>
+                        @if (isEditing)
+                        {
+                            <a href="/admin/promotions" class="btn btn-light border">Hủy chỉnh sửa</a>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột phải: Bảng danh sách Mã khuyến mãi -->
+    <div class="col-12 col-xl-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="fw-bold mb-0">Danh sách Khuyến mãi (@Model.Promotions.Count)</h6>
+                <form method="get" action="/admin/promotions" class="d-flex gap-2">
+                    <input type="text" name="search" class="form-control form-control-sm" value="@Model.Search" placeholder="Tìm mã hoặc tên..." />
+                    <button type="submit" class="btn btn-sm btn-outline-coffee" style="min-height: 32px;">Tìm</button>
+                </form>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Mã &amp; Chương trình</th>
+                            <th>Mức ưu đãi</th>
+                            <th>Thời hạn (VN)</th>
+                            <th>Lượt sử dụng</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-end pe-3">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Promotions.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">Chưa có chương trình khuyến mãi nào.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var p in Model.Promotions)
+                            {
+                                var isExpired = p.EndAt < nowUtc;
+                                var notStarted = p.StartAt > nowUtc;
+                                var outOfQuota = p.UsageLimit > 0 && p.UsedCount >= p.UsageLimit;
+                                var pctUsed = p.UsageLimit > 0 ? Math.Min(100, (int)Math.Round(p.UsedCount * 100.0 / p.UsageLimit)) : 0;
+
+                                <tr>
+                                    <td class="ps-3">
+                                        <span class="badge bg-cream text-coffee border font-monospace fs-6">@p.Code</span>
+                                        <div class="fw-semibold mt-1">@p.Name</div>
+                                    </td>
+                                    <td>
+                                        @if (p.Type == PromotionType.Percentage)
+                                        {
+                                            <div class="fw-bold text-success">Giảm @p.Value.ToString("0")%</div>
+                                            @if (p.MaxDiscount.HasValue && p.MaxDiscount.Value > 0)
+                                            {
+                                                <small class="text-muted d-block">Tối đa: @FormatHelper.Vnd(p.MaxDiscount.Value)</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="fw-bold text-success">Giảm @FormatHelper.Vnd(p.Value)</div>
+                                        }
+                                        <small class="text-muted">Đơn từ: @FormatHelper.Vnd(p.MinOrderValue)</small>
+                                    </td>
+                                    <td class="small">
+                                        <div>Từ: <strong>@FormatHelper.DateTimeVn(p.StartAt)</strong></div>
+                                        <div>Đến: <strong>@FormatHelper.DateTimeVn(p.EndAt)</strong></div>
+                                    </td>
+                                    <td style="min-width: 130px;">
+                                        <div class="d-flex justify-content-between small fw-semibold mb-1">
+                                            <span>@p.UsedCount / @p.UsageLimit</span>
+                                            <span class="text-muted">(@p.PerUserLimit/khách)</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar @(outOfQuota ? "bg-danger" : "bg-coffee")" style="width: @pctUsed%;"></div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (isExpired)
+                                        {
+                                            <span class="badge bg-danger">Hết hạn</span>
+                                        }
+                                        else if (outOfQuota)
+                                        {
+                                            <span class="badge bg-warning text-dark">Hết lượt</span>
+                                        }
+                                        else if (!p.IsActive)
+                                        {
+                                            <span class="badge bg-secondary">Tạm ngưng</span>
+                                        }
+                                        else if (notStarted)
+                                        {
+                                            <span class="badge bg-info text-dark">Sắp diễn ra</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Đang hiệu lực</span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="/admin/promotions?editId=@p.Id" class="btn btn-sm btn-light border" title="Chỉnh sửa">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="/admin/promotions/toggle/@p.Id" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border" title="@(p.IsActive ? "Tạm ngưng" : "Kích hoạt")">
+                                                    <i class="bi @(p.IsActive ? "bi-pause-circle text-warning" : "bi-play-circle text-success")"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="/admin/promotions/delete/@p.Id" class="d-inline"
+                                                  onsubmit="return confirm('Xác nhận xóa mã khuyến mãi &quot;@p.Code&quot;?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-light border text-danger" title="Xóa mềm">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const typeSel = document.getElementById('promoTypeSelect');
+            const maxWrap = document.getElementById('maxDiscountWrap');
+            const valInput = document.getElementById('promoValueInput');
+
+            function syncPromoTypeUi() {
+                if (!typeSel) return;
+                if (typeSel.value === 'Percentage') {
+                    if (maxWrap) maxWrap.style.opacity = '1';
+                    if (valInput) { valInput.max = '100'; valInput.min = '1'; }
+                } else {
+                    if (maxWrap) maxWrap.style.opacity = '0.45';
+                    if (valInput) { valInput.removeAttribute('max'); valInput.min = '1000'; }
+                }
+            }
+
+            typeSel?.addEventListener('change', syncPromoTypeUi);
+            syncPromoTypeUi();
+        })();
+    </script>
+}

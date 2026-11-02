@@ -1,0 +1,6 @@
+@model CoffeeShop.Models.Enums.OrderStatus
+<span class="order-status-badge" style="background-color: @Model.GetBadgeColor();">
+    <i class="bi @Model.GetStatusIcon()"></i>
+    <span>@Model.GetDisplayName()</span>
+</span>
+

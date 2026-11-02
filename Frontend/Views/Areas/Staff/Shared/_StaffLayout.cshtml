@@ -1,0 +1,107 @@
+@inject ISettingService SettingService
+@inject CoffeeShop.Data.AppDbContext DbContext
+@{
+    var store = await SettingService.GetStoreSettingsAsync();
+    var pendingCount = DbContext.Orders.Count(o => o.Status == OrderStatus.Pending);
+    var path = Context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    bool canToggleProduct = AppPolicies.HasAdminOrClaim(User, StaffPermissions.ToggleProduct);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] ?? "Vận hành ca") – Staff @store.ShopName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        :root {
+            --brand-primary: @store.PrimaryColor;
+            --brand-secondary: @store.SecondaryColor;
+            --brand-accent: @store.AccentColor;
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="staff-shell">
+    <partial name="~/Frontend/Views/Shared/_ToastPartial.cshtml" />
+
+    <!-- Thanh điều hướng tối ưu Máy tính bảng / Touch >= 48px (Mục 7.2 & 9) -->
+    <header class="bg-dark text-white shadow-sm sticky-top no-print" style="background: #1D1510 !important;">
+        <div class="container-fluid px-3 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <a href="/staff/dashboard" class="text-white text-decoration-none fw-bold d-flex align-items-center gap-2 me-2">
+                    <span class="rounded-3 bg-coffee d-inline-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="bi bi-cup-hot-fill"></i>
+                    </span>
+                    <div>
+                        <span class="d-block lh-1">@store.ShopName</span>
+                        <small class="text-warning fw-normal" style="font-size: 0.72rem;">STAFF POS &amp; 3D FLOOR</small>
+                    </div>
+                </a>
+
+                <nav class="d-flex flex-wrap gap-1">
+                    <a href="/staff/dashboard" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/dashboard") ? "btn-coffee" : "btn-outline-light border-0")">
+                        <i class="bi bi-grid-1x2-fill"></i> <span>Ca trực</span>
+                    </a>
+                    <a href="/staff/pos" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/pos") ? "btn-accent text-white" : "btn-outline-light border-0")">
+                        <i class="bi bi-calculator-fill"></i> <span>Bán hàng POS</span>
+                    </a>
+                    <a href="/staff/orders" class="btn staff-touch-btn btn-sm position-relative @(path.Contains("/staff/orders") ? "btn-coffee" : "btn-outline-light border-0")">
+                        <i class="bi bi-receipt-cutoff"></i> <span>Đơn hàng</span>
+                        <span class="badge rounded-pill bg-warning text-dark ms-1" data-staff-pending-badge style="display: @(pendingCount > 0 ? "inline-block" : "none")">@pendingCount</span>
+                    </a>
+                    <a href="/staff/tables" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/tables") ? "btn-coffee" : "btn-outline-light border-0")">
+                        <i class="bi bi-box-fill"></i> <span>Sơ đồ Bàn 3D</span>
+                    </a>
+                    <a href="/staff/reservations" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/reservations") ? "btn-coffee" : "btn-outline-light border-0")">
+                        <i class="bi bi-calendar-check"></i> <span class="d-none d-xl-inline">Đặt bàn</span>
+                    </a>
+                    <a href="/staff/customers" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/customers") ? "btn-coffee" : "btn-outline-light border-0")">
+                        <i class="bi bi-people-fill"></i> <span class="d-none d-xl-inline">Khách</span>
+                    </a>
+                    @if (canToggleProduct)
+                    {
+                        <a href="/staff/availability" class="btn staff-touch-btn btn-sm @(path.Contains("/staff/availability") ? "btn-coffee" : "btn-outline-light border-0")">
+                            <i class="bi bi-toggle-on"></i> <span class="d-none d-xl-inline">Tạm hết</span>
+                        </a>
+                    }
+                </nav>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                @if (User.IsInRole(AppRoles.Admin))
+                {
+                    <a href="/admin/dashboard" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-shield-check"></i> Admin
+                    </a>
+                }
+                <a href="/" class="btn btn-sm btn-outline-light" title="Xem trang khách hàng">
+                    <i class="bi bi-globe2"></i>
+                </a>
+                <a href="/staff/profile" class="btn btn-sm @(path.Contains("/staff/profile") ? "btn-coffee" : "btn-outline-light")">
+                    <i class="bi bi-person-badge me-1"></i> @(User.Identity?.Name?.Split('@')[0])
+                </a>
+                <form method="post" action="/logout" class="m-0">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-danger" title="Đăng xuất" style="min-height: 38px;">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <main class="container-fluid px-3 py-3">
+        @RenderBody()
+    </main>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script src="~/js/realtime-hub.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+

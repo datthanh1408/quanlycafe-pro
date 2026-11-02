@@ -1,0 +1,384 @@
+@using CoffeeShop.Areas.Admin.Models
+@model OrderAdminDetailViewModel
+@{
+    var o = Model.Order;
+    ViewData["Title"] = $"Chi tiết Đơn {o.Code}";
+    var isTerminal = o.Status is OrderStatus.Completed or OrderStatus.Cancelled;
+    var needsPaymentBeforeComplete = Model.NextStatus == OrderStatus.Completed && o.PaymentStatus != PaymentStatus.Paid;
+}
+
+<!-- Thanh tiêu đề & tác vụ nhanh -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h4 class="fw-bold mb-0 text-coffee">Đơn hàng @o.Code</h4>
+            <span class="order-status-badge" style="background-color: @o.Status.GetBadgeColor()">
+                <i class="bi @o.Status.GetStatusIcon()"></i> @o.Status.GetDisplayName()
+            </span>
+            @if (o.PaymentStatus == PaymentStatus.Paid)
+            {
+                <span class="badge bg-success px-3 py-2 rounded-pill"><i class="bi bi-check-circle-fill me-1"></i>Đã thanh toán (@o.PaymentMethod)</span>
+            }
+            else if (o.PaymentStatus == PaymentStatus.Refunded)
+            {
+                <span class="badge bg-secondary px-3 py-2 rounded-pill"><i class="bi bi-arrow-return-left me-1"></i>Đã hoàn tiền (Void)</span>
+            }
+            else
+            {
+                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill"><i class="bi bi-clock me-1"></i>Chưa thanh toán (@o.PaymentMethod)</span>
+            }
+        </div>
+        <div class="text-muted small">
+            Đặt lúc: <strong>@FormatHelper.DateTimeVn(o.CreatedAt)</strong> • Nguồn: <strong>@o.Source.GetDisplayName()</strong> • Hình thức: <strong>@o.OrderType.GetDisplayName()</strong>
+            @if (o.Table != null)
+            {
+                <span> • Bàn: <strong class="text-coffee">@o.Table.Code (@o.Table.Zone)</strong></span>
+            }
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/admin/orders" class="btn btn-outline-secondary bg-white">
+            <i class="bi bi-arrow-left me-1"></i>Danh sách đơn
+        </a>
+        <a href="/staff/orders/receipt/@o.Id" target="_blank" class="btn btn-light border fw-semibold">
+            <i class="bi bi-printer-fill text-coffee me-1"></i>In Hóa đơn
+        </a>
+    </div>
+</div>
+
+<!-- Khung điều hành trạng thái & đặc quyền Admin -->
+<div class="card border-0 shadow-sm mb-4 bg-white">
+    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- 1. Xác nhận thu tiền -->
+            @if (o.PaymentStatus == PaymentStatus.Unpaid && o.Status != OrderStatus.Cancelled)
+            {
+                <form method="post" action="/admin/orders/confirm-payment" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@o.Id" />
+                    <button type="submit" class="btn btn-success fw-semibold">
+                        <i class="bi bi-cash-coin me-1"></i>Xác nhận Đã thu tiền (@FormatHelper.Vnd(o.Total))
+                    </button>
+                </form>
+            }
+
+            <!-- 2. Tiến 1 bước trạng thái -->
+            @if (Model.NextStatus.HasValue)
+            {
+                <form method="post" action="/admin/orders/advance-status" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@o.Id" />
+                    <input type="hidden" name="targetStatus" value="@Model.NextStatus.Value" />
+                    <input type="hidden" name="rowVersionBase64" value="@Model.RowVersionBase64" />
+                    <button type="submit" class="btn btn-coffee" disabled="@needsPaymentBeforeComplete">
+                        <i class="bi bi-arrow-right-circle-fill me-1"></i>Chuyển sang: @Model.NextStatus.Value.GetDisplayName()
+                    </button>
+                </form>
+                @if (needsPaymentBeforeComplete)
+                {
+                    <span class="small text-danger fw-semibold">
+                        <i class="bi bi-exclamation-circle me-1"></i>Cần xác nhận Đã thu tiền trước khi Hoàn thành.
+                    </span>
+                }
+            }
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- 3. Admin Lùi 1 bước (Rollback kèm lý do bắt buộc) -->
+            @if (Model.RollbackStatus.HasValue)
+            {
+                <button type="button" class="btn btn-outline-warning text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#rollbackModal">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Lùi về: @Model.RollbackStatus.Value.GetDisplayName()
+                </button>
+            }
+
+            <!-- 4. Hủy đơn hàng (mọi trạng thái chưa Hoàn thành / chưa Hủy) -->
+            @if (!isTerminal)
+            {
+                <button type="button" class="btn btn-outline-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                    <i class="bi bi-x-octagon me-1"></i>Hủy đơn hàng
+                </button>
+            }
+
+            <!-- 5. Hoàn tiền / Void cho đơn đã Hoàn thành -->
+            @if (o.Status == OrderStatus.Completed && o.PaymentStatus != PaymentStatus.Refunded)
+            {
+                <button type="button" class="btn btn-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#voidRefundModal">
+                    <i class="bi bi-arrow-return-left me-1"></i>Hoàn tiền / Void đơn Hoàn thành
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Cột trái: Danh sách món & Tổng kết tài chính -->
+    <div class="col-12 col-xl-8">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-cup-hot text-coffee me-2"></i>Chi tiết Món đã đặt (@o.Items.Sum(x => x.Quantity) món)</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Sản phẩm &amp; Tùy chọn</th>
+                            <th class="text-end">Đơn giá</th>
+                            <th class="text-center">SL</th>
+                            <th class="text-end pe-3">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in o.Items)
+                        {
+                            var opts = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(item.SizeName)) opts.Add($"Size {item.SizeName}");
+                            if (!string.IsNullOrWhiteSpace(item.Temperature)) opts.Add(item.Temperature);
+                            if (!string.IsNullOrWhiteSpace(item.SugarLevel)) opts.Add($"Đường {item.SugarLevel}");
+                            if (!string.IsNullOrWhiteSpace(item.IceLevel)) opts.Add($"Đá {item.IceLevel}");
+
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold">@item.ProductName</div>
+                                    @if (opts.Count > 0)
+                                    {
+                                        <div class="small text-muted">@string.Join(" • ", opts)</div>
+                                    }
+                                    @if (item.Toppings != null && item.Toppings.Any())
+                                    {
+                                        <div class="small text-coffee mt-1">
+                                            <i class="bi bi-plus-circle me-1"></i>Topping:
+                                            @string.Join(", ", item.Toppings.Select(t => $"{t.ToppingName} (+{FormatHelper.Vnd(t.Price)})"))
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Note))
+                                    {
+                                        <div class="small fst-italic text-secondary mt-1">Ghi chú món: "@item.Note"</div>
+                                    }
+                                </td>
+                                <td class="text-end">@FormatHelper.Vnd(item.UnitPrice)</td>
+                                <td class="text-center fw-bold">x@(item.Quantity)</td>
+                                <td class="text-end pe-3 fw-bold text-coffee">@FormatHelper.Vnd(item.LineTotal)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="3" class="text-end text-muted">Tạm tính:</td>
+                            <td class="text-end pe-3 fw-semibold">@FormatHelper.Vnd(o.Subtotal)</td>
+                        </tr>
+                        @if (o.DiscountAmount > 0)
+                        {
+                            <tr>
+                                <td colspan="3" class="text-end text-success">
+                                    Giảm giá @(o.Promotion != null ? $"({o.Promotion.Code})" : ""):
+                                </td>
+                                <td class="text-end pe-3 fw-semibold text-success">-@FormatHelper.Vnd(o.DiscountAmount)</td>
+                            </tr>
+                        }
+                        @if (o.ShippingFee > 0)
+                        {
+                            <tr>
+                                <td colspan="3" class="text-end text-muted">Phí giao hàng:</td>
+                                <td class="text-end pe-3 fw-semibold">+@FormatHelper.Vnd(o.ShippingFee)</td>
+                            </tr>
+                        }
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold fs-5">Tổng thanh toán:</td>
+                            <td class="text-end pe-3 fw-bold fs-5 text-coffee">@FormatHelper.Vnd(o.Total)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(o.CancelReason))
+        {
+            <div class="alert alert-danger border-0 shadow-xs">
+                <h6 class="fw-bold mb-1"><i class="bi bi-exclamation-octagon-fill me-2"></i>Thông tin Hủy đơn / Hoàn tiền (Void)</h6>
+                <div>Lý do: <strong>@o.CancelReason</strong></div>
+                <div class="small mt-1">Thực hiện bởi: <strong>@(o.CancelledBy ?? "-")</strong> lúc @(o.CancelledAt.HasValue ? FormatHelper.DateTimeVn(o.CancelledAt.Value) : "-")</div>
+            </div>
+        }
+    </div>
+
+    <!-- Cột phải: Thông tin Khách hàng & Timeline Lịch sử trạng thái -->
+    <div class="col-12 col-xl-4">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-coffee me-2"></i>Thông tin Khách &amp; Giao nhận</h6>
+            </div>
+            <div class="card-body small">
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Khách hàng:</span>
+                    <strong>
+                        @if (!string.IsNullOrWhiteSpace(o.CustomerId))
+                        {
+                            <a href="/admin/customers/detail/@o.CustomerId" class="text-coffee text-decoration-none">@o.CustomerName</a>
+                        }
+                        else
+                        {
+                            @o.CustomerName
+                        }
+                    </strong>
+                </div>
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Số điện thoại:</span>
+                    <strong>@(string.IsNullOrWhiteSpace(o.Phone) ? "-" : o.Phone)</strong>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(o.DeliveryAddress))
+                {
+                    <div class="mb-2">
+                        <span class="text-muted d-block">Địa chỉ giao hàng:</span>
+                        <strong>@o.DeliveryAddress</strong>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(o.Note))
+                {
+                    <div class="mb-2">
+                        <span class="text-muted d-block">Ghi chú đơn:</span>
+                        <strong class="fst-italic">@o.Note</strong>
+                    </div>
+                }
+                <hr />
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Nhân viên phụ trách:</span>
+                    <strong>@(o.Staff?.FullName ?? "Đặt trực tuyến")</strong>
+                </div>
+                <div class="mb-0 d-flex justify-content-between">
+                    <span class="text-muted">Thu ngân xác nhận:</span>
+                    <strong>@(o.PaymentConfirmedBy ?? "-") @(o.PaidAt.HasValue ? $"({FormatHelper.DateTimeVn(o.PaidAt.Value, "HH:mm dd/MM")})" : "")</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline OrderStatusHistory -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-clock-history text-coffee me-2"></i>Nhật ký Tiến trình Đơn hàng</h6>
+            </div>
+            <div class="card-body">
+                @foreach (var h in o.StatusHistories.OrderByDescending(x => x.ChangedAt).ThenByDescending(x => x.Id))
+                {
+                    <div class="border-start border-2 ps-3 pb-3 position-relative" style="border-color: @h.ToStatus.GetBadgeColor() !important;">
+                        <span class="position-absolute top-0 start-0 translate-middle rounded-circle"
+                              style="width: 11px; height: 11px; background-color: @h.ToStatus.GetBadgeColor(); margin-top: 6px;"></span>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong class="small" style="color: @h.ToStatus.GetBadgeColor()">
+                                @if (h.FromStatus != h.ToStatus)
+                                {
+                                    <span>@h.FromStatus.GetDisplayName() &rarr; @h.ToStatus.GetDisplayName()</span>
+                                }
+                                else
+                                {
+                                    <span>@h.ToStatus.GetDisplayName()</span>
+                                }
+                            </strong>
+                            <small class="text-muted">@FormatHelper.DateTimeVn(h.ChangedAt, "dd/MM HH:mm")</small>
+                        </div>
+                        <div class="small text-muted">Bởi: <strong>@h.ChangedBy</strong></div>
+                        @if (!string.IsNullOrWhiteSpace(h.Note))
+                        {
+                            <div class="small bg-light border rounded px-2 py-1 mt-1">@h.Note</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 1: Admin 1-step Rollback -->
+@if (Model.RollbackStatus.HasValue)
+{
+    <div class="modal fade" id="rollbackModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="/admin/orders/rollback-status" class="modal-content">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@o.Id" />
+                <input type="hidden" name="targetStatus" value="@Model.RollbackStatus.Value" />
+                <input type="hidden" name="rowVersionBase64" value="@Model.RowVersionBase64" />
+                <div class="modal-header bg-warning-subtle">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-arrow-counterclockwise me-2"></i>Lùi trạng thái đơn (Admin Rollback)</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small mb-3">
+                        Chuyển trạng thái đơn <strong>@o.Code</strong> từ
+                        <span class="badge bg-dark">@o.Status.GetDisplayName()</span> lùi 1 bước về
+                        <span class="badge bg-warning text-dark">@Model.RollbackStatus.Value.GetDisplayName()</span>.
+                    </p>
+                    <div>
+                        <label class="form-label fw-semibold">Lý do lùi trạng thái <span class="text-danger">*</span></label>
+                        <textarea name="reason" rows="3" class="form-control" required maxlength="180" placeholder="VD: Nhân viên bấm nhầm hoàn tất pha chế, cần pha lại..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-warning fw-bold">Xác nhận Lùi 1 bước</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- Modal 2: Hủy đơn hàng -->
+@if (!isTerminal)
+{
+    <div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="/admin/orders/cancel" class="modal-content">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@o.Id" />
+                <div class="modal-header bg-danger text-white">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Xác nhận Hủy Đơn hàng @o.Code</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small">
+                        <i class="bi bi-info-circle-fill me-1"></i>Nếu đơn đã thu tiền sẽ tự chuyển sang <strong>Đã hoàn tiền</strong>, hoàn lượt mã khuyến mãi và giải phóng bàn. Nguyên liệu đã xuất pha chế không tự hoàn kho.
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold">Lý do hủy đơn <span class="text-danger">*</span></label>
+                        <textarea name="reason" rows="3" class="form-control" required maxlength="200" placeholder="Nhập lý do hủy đơn..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Giữ lại đơn</button>
+                    <button type="submit" class="btn btn-danger fw-bold">Hủy đơn ngay</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- Modal 3: Hoàn tiền / Void đơn Hoàn thành -->
+@if (o.Status == OrderStatus.Completed && o.PaymentStatus != PaymentStatus.Refunded)
+{
+    <div class="modal fade" id="voidRefundModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="/admin/orders/void-refund" class="modal-content">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@o.Id" />
+                <div class="modal-header bg-danger text-white">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-arrow-return-left me-2"></i>Hoàn tiền / Void Đơn đã Hoàn thành</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small">
+                        Đơn <strong>@o.Code</strong> (@FormatHelper.Vnd(o.Total)) sẽ chuyển sang trạng thái thanh toán <strong>Đã hoàn tiền</strong>, loại khỏi doanh thu thực thu và trừ lại điểm tích lũy đã cộng cho khách.
+                    </p>
+                    <div>
+                        <label class="form-label fw-semibold">Lý do hoàn tiền / void <span class="text-danger">*</span></label>
+                        <textarea name="reason" rows="3" class="form-control" required maxlength="200" placeholder="VD: Sự cố chất lượng đồ uống, hoàn tiền toàn bộ cho khách..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger fw-bold">Xác nhận Hoàn tiền (Void)</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

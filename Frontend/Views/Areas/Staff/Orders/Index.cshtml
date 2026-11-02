@@ -1,0 +1,243 @@
+@using CoffeeShop.Areas.Staff.Models
+@model StaffOrderListVm
+@{
+    ViewData["Title"] = "Quản lý đơn hàng";
+    var currentUrl = Context.Request.Path + Context.Request.QueryString;
+
+    string BuildTabUrl(OrderStatus? tabStatus)
+    {
+        var parts = new List<string>();
+        if (tabStatus.HasValue) parts.Add($"status={tabStatus.Value}");
+        if (!string.IsNullOrWhiteSpace(Model.SearchKeyword)) parts.Add($"q={Uri.EscapeDataString(Model.SearchKeyword)}");
+        if (!string.IsNullOrWhiteSpace(Model.DateFilter)) parts.Add($"date={Model.DateFilter}");
+        return parts.Count > 0 ? $"/staff/orders?{string.Join("&", parts)}" : "/staff/orders";
+    }
+
+    var allStatuses = new[]
+    {
+        OrderStatus.Pending,
+        OrderStatus.Confirmed,
+        OrderStatus.Brewing,
+        OrderStatus.Ready,
+        OrderStatus.Delivering,
+        OrderStatus.Completed,
+        OrderStatus.Cancelled
+    };
+}
+
+<!-- Banner đơn mới realtime -->
+<div id="ordersLiveBanner" class="alert alert-warning border-warning shadow-sm d-none align-items-center justify-content-between mb-3">
+    <div>
+        <i class="bi bi-broadcast-pin me-2"></i>
+        <strong id="ordersLiveBannerTitle">Có đơn hàng vừa cập nhật!</strong>
+        <span class="small ms-1"> Tải lại danh sách để xem trạng thái mới nhất.</span>
+    </div>
+    <button type="button" class="btn btn-sm btn-coffee" onclick="location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i> Tải lại ngay
+    </button>
+</div>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h4 fw-bold mb-1">
+            <i class="bi bi-receipt-cutoff text-coffee me-2"></i>Điều phối &amp; Xử lý Đơn hàng
+        </h1>
+        <div class="text-muted small">Chuyển trạng thái từng bước, tự động trừ kho khi Pha chế, thu tiền &amp; in hóa đơn</div>
+    </div>
+    <a href="/staff/pos" class="btn btn-accent text-white staff-touch-btn px-3 shadow-sm">
+        <i class="bi bi-plus-circle-fill"></i>
+        <span>Tạo đơn POS mới</span>
+    </a>
+</div>
+
+<!-- Thanh Tìm kiếm & Lọc ngày -->
+<div class="stat-card mb-3 py-3">
+    <form method="get" action="/staff/orders" class="row g-2 align-items-center">
+        @if (Model.CurrentStatus.HasValue)
+        {
+            <input type="hidden" name="status" value="@Model.CurrentStatus.Value" />
+        }
+        <div class="col-12 col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" name="q" value="@Model.SearchKeyword" class="form-control" style="min-height: 48px;"
+                       placeholder="Tìm mã đơn (CF-...), tên khách hàng, số điện thoại..." />
+            </div>
+        </div>
+        <div class="col-7 col-md-3">
+            <input type="date" name="date" value="@Model.DateFilter" class="form-control" style="min-height: 48px;" aria-label="Lọc theo ngày" />
+        </div>
+        <div class="col-5 col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-coffee staff-touch-btn px-4 flex-grow-1">
+                <i class="bi bi-funnel-fill"></i> Lọc đơn
+            </button>
+            @if (!string.IsNullOrWhiteSpace(Model.SearchKeyword) || !string.IsNullOrWhiteSpace(Model.DateFilter) || Model.CurrentStatus.HasValue)
+            {
+                <a href="/staff/orders" class="btn btn-outline-secondary staff-touch-btn px-3" title="Xóa bộ lọc">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<!-- Tabs theo OrderStatus (Touch >= 48px) -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="@BuildTabUrl(null)"
+       class="btn staff-touch-btn px-3 @(Model.CurrentStatus == null ? "btn-coffee shadow-sm" : "btn-outline-coffee bg-white")">
+        <span>Tất cả</span>
+        <span class="badge rounded-pill @(Model.CurrentStatus == null ? "bg-white text-dark" : "bg-secondary")">@Model.AllCount</span>
+    </a>
+
+    @foreach (var st in allStatuses)
+    {
+        var count = Model.StatusCounts.TryGetValue(st, out var c) ? c : 0;
+        bool isActive = Model.CurrentStatus == st;
+        <a href="@BuildTabUrl(st)"
+           class="btn staff-touch-btn px-3 @(isActive ? "text-white shadow-sm border-0" : "bg-white border text-dark")"
+           style="@(isActive ? $"background-color:{st.GetBadgeColor()};" : "")">
+            <i class="bi @st.GetStatusIcon()" style="@(!isActive ? $"color:{st.GetBadgeColor()};" : "")"></i>
+            <span>@st.GetDisplayName()</span>
+            <span class="badge rounded-pill @(isActive ? "bg-white text-dark" : "bg-light text-dark border")">@count</span>
+        </a>
+    }
+</div>
+
+<!-- Danh sách đơn hàng -->
+<div class="stat-card">
+    @if (Model.Orders.Items.Count == 0)
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-cup-straw fs-1 d-block mb-2"></i>
+            <p class="mb-1 fw-semibold">Không tìm thấy đơn hàng nào khớp bộ lọc hiện tại.</p>
+            <a href="/staff/orders" class="btn btn-sm btn-outline-coffee mt-2">Xem tất cả đơn hàng</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Mã đơn</th>
+                        <th>Thời gian</th>
+                        <th>Khách hàng</th>
+                        <th>Hình thức / Bàn</th>
+                        <th class="text-center">SL món</th>
+                        <th class="text-end">Tổng cộng</th>
+                        <th>Thanh toán</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Xử lý nhanh</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model.Orders.Items)
+                    {
+                        <tr>
+                            <td>
+                                <a href="/staff/orders/detail/@o.Id" class="fw-bold text-coffee text-decoration-none d-block">@o.Code</a>
+                                <span class="badge bg-light text-secondary border">@o.Source.GetDisplayName()</span>
+                            </td>
+                            <td class="small text-muted text-nowrap">
+                                @FormatHelper.DateTimeVn(o.CreatedAt, "dd/MM/yyyy")<br />
+                                <strong>@FormatHelper.DateTimeVn(o.CreatedAt, "HH:mm")</strong>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">@o.CustomerName</div>
+                                @if (!string.IsNullOrWhiteSpace(o.Phone))
+                                {
+                                    <div class="small text-muted"><i class="bi bi-telephone me-1"></i>@o.Phone</div>
+                                }
+                            </td>
+                            <td>
+                                <div>@o.OrderType.GetDisplayName()</div>
+                                @if (!string.IsNullOrWhiteSpace(o.TableCode))
+                                {
+                                    <span class="badge bg-dark"><i class="bi bi-geo-alt-fill me-1"></i>Bàn @o.TableCode</span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold">@o.ItemCount</td>
+                            <td class="text-end fw-bold text-coffee text-nowrap">@FormatHelper.Vnd(o.Total)</td>
+                            <td>
+                                @if (o.PaymentStatus == PaymentStatus.Paid)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-check2-circle me-1"></i>Đã thu (@o.PaymentMethod)
+                                    </span>
+                                }
+                                else if (o.PaymentStatus == PaymentStatus.Refunded)
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border">Đã hoàn tiền</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning-subtle text-dark border border-warning-subtle">
+                                        Chưa thu (@o.PaymentMethod)
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <span class="order-status-badge" style="background-color: @o.Status.GetBadgeColor();">
+                                    <i class="bi @o.Status.GetStatusIcon()"></i>
+                                    @o.Status.GetDisplayName()
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                                    @if (o.NextForwardStatus.HasValue && !(o.NextForwardStatus.Value == OrderStatus.Completed && o.PaymentStatus != PaymentStatus.Paid))
+                                    {
+                                        var nextSt = o.NextForwardStatus.Value;
+                                        <form method="post" action="/staff/orders/change-status" class="m-0">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@o.Id" />
+                                            <input type="hidden" name="targetStatus" value="@nextSt" />
+                                            <input type="hidden" name="rowVersionBase64" value="@o.RowVersionBase64" />
+                                            <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                            <button type="submit" class="btn btn-sm text-white staff-touch-btn px-3"
+                                                    style="background-color: @nextSt.GetBadgeColor();"
+                                                    title="Chuyển sang @nextSt.GetDisplayName()">
+                                                <i class="bi bi-arrow-right-circle-fill"></i>
+                                                <span>@nextSt.GetDisplayName()</span>
+                                            </button>
+                                        </form>
+                                    }
+                                    <a href="/staff/orders/detail/@o.Id" class="btn btn-sm btn-outline-coffee staff-touch-btn px-3">
+                                        <i class="bi bi-sliders"></i> Chi tiết
+                                    </a>
+                                    <a href="/staff/orders/receipt/@o.Id" class="btn btn-sm btn-outline-secondary staff-touch-btn px-2" title="Xem & In hóa đơn">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 pt-2 border-top">
+            <div class="small text-muted">
+                Hiển thị <strong>@Model.Orders.Items.Count</strong> / <strong>@Model.Orders.TotalItems</strong> đơn hàng (Trang @Model.Orders.Page / @Model.Orders.TotalPages)
+            </div>
+            <partial name="~/Frontend/Views/Shared/_Pagination.cshtml" model="(Model.Orders.Page, Model.Orders.TotalPages, Model.BaseQueryUrl)" />
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        if (window.DatMocRealtime) {
+            const showLive = (msg) => {
+                const el = document.getElementById('ordersLiveBanner');
+                const title = document.getElementById('ordersLiveBannerTitle');
+                if (title && msg) title.textContent = msg;
+                if (el) {
+                    el.classList.remove('d-none');
+                    el.classList.add('d-flex');
+                }
+            };
+            window.DatMocRealtime.onNewOrder((p) => showLive(`Đơn mới ${p?.code || ''} vừa đến!`));
+            window.DatMocRealtime.onStatusChanged((p) => showLive(`Đơn ${p?.code || ''} vừa cập nhật trạng thái.`));
+        }
+    </script>
+}

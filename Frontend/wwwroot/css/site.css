@@ -1,0 +1,329 @@
+/* ==========================================================================
+   SITE STYLESHEET – ĐẠT MỘC COFFEE (Customer, Staff, Admin + Three.js UI)
+   ========================================================================== */
+body {
+    font-family: var(--font-sans);
+    background-color: var(--surface-bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+    font-family: var(--font-display);
+}
+
+/* Focus rõ ràng đạt WCAG AA (Mục 9) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.btn:focus-visible {
+    outline: 3px solid var(--brand-accent) !important;
+    outline-offset: 2px;
+}
+
+/* Nút thương hiệu */
+.btn-coffee {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: #FFFFFF;
+    font-weight: 600;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.18s ease, transform 0.15s ease;
+}
+.btn-coffee:hover, .btn-coffee:focus {
+    background-color: var(--brand-primary-dark);
+    border-color: var(--brand-primary-dark);
+    color: #FFFFFF;
+}
+
+.btn-accent {
+    background-color: var(--brand-accent);
+    border-color: var(--brand-accent);
+    color: #FFFFFF;
+    font-weight: 600;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-accent:hover, .btn-accent:focus {
+    background-color: var(--brand-accent-dark);
+    border-color: var(--brand-accent-dark);
+    color: #FFFFFF;
+}
+
+.btn-outline-coffee {
+    border: 1.5px solid var(--brand-primary);
+    color: var(--brand-primary);
+    background: transparent;
+    font-weight: 600;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-outline-coffee:hover {
+    background-color: var(--brand-primary);
+    color: #FFFFFF;
+}
+
+.bg-coffee { background-color: var(--brand-primary) !important; color: #fff; }
+.bg-cream { background-color: var(--brand-secondary) !important; }
+.text-coffee { color: var(--brand-primary) !important; }
+.text-accent { color: var(--brand-accent) !important; }
+
+/* Navbar Customer */
+.customer-navbar {
+    background: rgba(255, 253, 250, 0.94);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Product Card */
+.product-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+.product-card.is-unavailable {
+    opacity: 0.68;
+}
+.product-card-img-wrap {
+    position: relative;
+    aspect-ratio: 4 / 3.4;
+    overflow: hidden;
+    background: var(--brand-secondary);
+}
+.product-card-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.unavailable-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(24, 18, 14, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Three.js Containers */
+.three-hero-stage {
+    position: relative;
+    width: 100%;
+    height: 480px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 35%, #3E2723 0%, #1B110B 100%);
+    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.three-drink-stage {
+    position: relative;
+    width: 100%;
+    height: 390px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 40%, #F6EFE7 0%, #E4D4C3 100%);
+    border: 1px solid var(--border-subtle);
+}
+.three-floorplan-stage {
+    position: relative;
+    width: 100%;
+    height: 540px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: linear-gradient(180deg, #1E1713 0%, #2C211B 100%);
+    border: 1px solid var(--border-subtle);
+}
+.three-canvas-overlay {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+}
+.three-canvas-overlay .interactive-pill {
+    pointer-events: auto;
+}
+.three-tooltip {
+    position: absolute;
+    z-index: 20;
+    pointer-events: none;
+    background: rgba(24, 17, 12, 0.92);
+    color: #FFFDF9;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    transform: translate(-50%, -120%);
+    white-space: nowrap;
+    display: none;
+}
+
+/* Status Badge chuẩn Mục 9 */
+.order-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.72rem;
+    border-radius: 999px;
+    font-size: 0.81rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    letter-spacing: 0.01em;
+}
+
+/* Staff Touch-friendly UI (Mục 7.2 & 9: nút >= 48px) */
+.staff-shell {
+    background-color: #F3F4F6;
+    min-height: 100vh;
+}
+.staff-touch-btn {
+    min-height: 48px;
+    min-width: 48px;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+.pos-product-tile {
+    cursor: pointer;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: #FFFFFF;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    min-height: 120px;
+    user-select: none;
+}
+.pos-product-tile:hover, .pos-product-tile:active {
+    border-color: var(--brand-primary);
+    background: #FFFBF7;
+}
+
+/* Admin Sidebar Thu gọn được (Mục 7.3 & 12) */
+.admin-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background: #F4F5F7;
+}
+.admin-sidebar {
+    width: 260px;
+    background: #1E1611;
+    color: #EFE6DD;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.22s ease, transform 0.22s ease;
+    z-index: 1035;
+}
+.admin-wrapper.sidebar-collapsed .admin-sidebar {
+    width: 76px;
+}
+.admin-wrapper.sidebar-collapsed .admin-sidebar .nav-label,
+.admin-wrapper.sidebar-collapsed .admin-sidebar .brand-text {
+    display: none;
+}
+.admin-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.72rem 1.1rem;
+    color: rgba(246, 239, 231, 0.78);
+    text-decoration: none;
+    border-radius: 0.6rem;
+    margin: 0.15rem 0.65rem;
+    font-size: 0.92rem;
+    min-height: 44px;
+}
+.admin-nav-link:hover, .admin-nav-link.active {
+    background: var(--brand-primary);
+    color: #FFFFFF;
+}
+.admin-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.stat-card {
+    background: #FFFFFF;
+    border-radius: var(--radius-lg);
+    border: 1px solid #E5E7EB;
+    padding: 1.25rem;
+    box-shadow: var(--shadow-xs);
+}
+
+/* Thanh giỏ hàng cố định phía dưới trên Mobile (Mục 12) */
+.mobile-sticky-cart {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    background: var(--surface-dark);
+    color: #FFFFFF;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive Sidebar cho màn hình nhỏ (Mục 12) */
+@media (max-width: 991.98px) {
+    .admin-sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        transform: translateX(-100%);
+        width: 260px !important;
+    }
+    .admin-wrapper.mobile-sidebar-open .admin-sidebar {
+        transform: translateX(0);
+    }
+    .three-hero-stage {
+        height: 360px;
+    }
+    .three-floorplan-stage {
+        height: 430px;
+    }
+}
+
+/* Tôn trọng prefers-reduced-motion (Mục 9) */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Trang in hóa đơn nhiệt / A5 chuẩn @media print (Mục 7.2) */
+@media print {
+    .no-print, nav, header, footer, .admin-sidebar, .btn {
+        display: none !important;
+    }
+    body, .card {
+        background: #FFFFFF !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+}

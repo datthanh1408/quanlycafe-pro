@@ -1,0 +1,114 @@
+@using CoffeeShop.Areas.Admin.Models
+@model CustomerDetailViewModel
+@{
+    var c = Model.Customer;
+    ViewData["Title"] = $"Hồ sơ Khách hàng: {c.FullName}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-person-vcard-fill me-2"></i>@c.FullName</h4>
+        <div class="text-muted small">Thành viên từ @FormatHelper.DateTimeVn(c.CreatedAt, "dd/MM/yyyy") • Email: <strong>@c.Email</strong></div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/customers" class="btn btn-outline-secondary bg-white">
+            <i class="bi bi-arrow-left me-1"></i>Danh sách khách hàng
+        </a>
+        <form method="post" action="/admin/customers/toggle-lock" class="d-inline"
+              onsubmit="return confirm('Xác nhận @(c.IsActive ? "khóa" : "mở khóa") tài khoản khách hàng này?');">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="userId" value="@c.Id" />
+            <input type="hidden" name="returnUrl" value="/admin/customers/detail/@c.Id" />
+            <button type="submit" class="btn @(c.IsActive ? "btn-outline-danger" : "btn-success")">
+                <i class="bi @(c.IsActive ? "bi-lock-fill" : "bi-unlock-fill") me-1"></i>@(c.IsActive ? "Khóa tài khoản" : "Mở khóa tài khoản")
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Tổng chi tiêu tích lũy</div>
+            <div class="fs-3 fw-bold text-coffee mt-1">@FormatHelper.Vnd(c.TotalSpend)</div>
+            <div class="small text-success mt-1">Từ @c.CompletedOrderCount đơn Hoàn thành &amp; Đã thu tiền</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Điểm thưởng hiện có</div>
+            <div class="fs-3 fw-bold text-warning-emphasis mt-1"><i class="bi bi-award-fill text-warning me-1"></i>@c.LoyaltyPoints điểm</div>
+            <div class="small text-muted mt-1">Trạng thái: <strong class="@(c.IsActive ? "text-success" : "text-danger")">@(c.IsActive ? "Đang hoạt động" : "Đã khóa")</strong></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Thông tin liên hệ &amp; Giao hàng</div>
+            <div class="fw-semibold mt-1"><i class="bi bi-telephone me-1 text-coffee"></i>@(string.IsNullOrWhiteSpace(c.Phone) ? "Chưa cập nhật SĐT" : c.Phone)</div>
+            <div class="small text-muted mt-1"><i class="bi bi-geo-alt me-1"></i>@(string.IsNullOrWhiteSpace(c.Address) ? "Chưa lưu địa chỉ mặc định" : c.Address)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-receipt-cutoff text-coffee me-2"></i>Lịch sử Đặt hàng (@Model.Orders.Count đơn)</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Mã đơn</th>
+                    <th>Thời gian (VN)</th>
+                    <th>Hình thức</th>
+                    <th class="text-center">Số món</th>
+                    <th>Thanh toán</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Tổng tiền</th>
+                    <th class="text-end pe-3">Xem đơn</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Orders.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">Khách hàng chưa có đơn hàng nào.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var o in Model.Orders)
+                    {
+                        <tr>
+                            <td class="ps-3 fw-bold">
+                                <a href="/admin/orders/detail/@o.Id" class="text-coffee text-decoration-none">@o.Code</a>
+                            </td>
+                            <td class="small">@FormatHelper.DateTimeVn(o.CreatedAt)</td>
+                            <td>
+                                <span class="badge bg-light text-dark border">@o.OrderType.GetDisplayName()</span>
+                                @if (o.Table != null)
+                                {
+                                    <span class="badge bg-cream text-coffee border ms-1">Bàn @o.Table.Code</span>
+                                }
+                            </td>
+                            <td class="text-center">@o.Items.Sum(i => i.Quantity)</td>
+                            <td>
+                                <span class="small fw-semibold">@o.PaymentMethod</span> •
+                                <span class="small">@o.PaymentStatus.GetDisplayName()</span>
+                            </td>
+                            <td>
+                                <span class="order-status-badge" style="background-color: @o.Status.GetBadgeColor()">
+                                    <i class="bi @o.Status.GetStatusIcon()"></i> @o.Status.GetDisplayName()
+                                </span>
+                            </td>
+                            <td class="text-end fw-bold">@FormatHelper.Vnd(o.Total)</td>
+                            <td class="text-end pe-3">
+                                <a href="/admin/orders/detail/@o.Id" class="btn btn-sm btn-outline-coffee" style="min-height: 32px;">Chi tiết</a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

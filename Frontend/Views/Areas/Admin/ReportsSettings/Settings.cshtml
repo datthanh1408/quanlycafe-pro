@@ -1,0 +1,409 @@
+@using CoffeeShop.Areas.Admin.Models
+@model SettingsAdminViewModel
+@{
+    ViewData["Title"] = "Cài đặt Hệ thống";
+    var f = Model.Form;
+    var activeTab = string.IsNullOrWhiteSpace(f.ActiveTab) ? "tab-store" : f.ActiveTab;
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-sliders me-2"></i>Cấu hình Hệ thống &amp; Nhận diện Thương hiệu</h4>
+        <div class="text-muted small">Mọi thay đổi được lưu vào cơ sở dữ liệu và áp dụng tức thì cho giao diện Khách hàng, POS Nhân viên và Quản trị.</div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom pt-3 pb-0">
+        <ul class="nav nav-tabs card-header-tabs fw-semibold flex-nowrap overflow-auto" id="settingsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(activeTab == "tab-store" ? "active" : "") text-coffee text-nowrap"
+                        data-tab-key="tab-store" data-bs-toggle="tab" data-bs-target="#pane-store" type="button" role="tab">
+                    <i class="bi bi-shop me-1"></i>1. Thông tin Quán &amp; Logo
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(activeTab == "tab-brand" ? "active" : "") text-coffee text-nowrap"
+                        data-tab-key="tab-brand" data-bs-toggle="tab" data-bs-target="#pane-brand" type="button" role="tab">
+                    <i class="bi bi-palette-fill me-1"></i>2. Màu thương hiệu
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(activeTab == "tab-contact" ? "active" : "") text-coffee text-nowrap"
+                        data-tab-key="tab-contact" data-bs-toggle="tab" data-bs-target="#pane-contact" type="button" role="tab">
+                    <i class="bi bi-geo-alt-fill me-1"></i>3. Liên hệ, MXH &amp; Bản đồ
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(activeTab == "tab-payment" ? "active" : "") text-coffee text-nowrap"
+                        data-tab-key="tab-payment" data-bs-toggle="tab" data-bs-target="#pane-payment" type="button" role="tab">
+                    <i class="bi bi-qr-code-scan me-1"></i>4. Thanh toán &amp; Ngân hàng QR
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(activeTab == "tab-operations" ? "active" : "") text-coffee text-nowrap"
+                        data-tab-key="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
+                    <i class="bi bi-truck me-1"></i>5. Giao hàng, Điểm &amp; Đặt bàn
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card-body p-4">
+        <!-- Bảng bật/tắt nhanh Phương thức thanh toán (nằm riêng để tránh lồng form) -->
+        @if (Model.PaymentMethods.Count > 0)
+        {
+            <div id="paymentMethodsQuickPanel" class="mb-4" style="display: @(activeTab == "tab-payment" ? "block" : "none");">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-credit-card-2-front text-coffee me-2"></i>Bật / Tắt Phương thức Thanh toán</h6>
+                    @if (Model.IsQrConfigured)
+                    {
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Chuyển khoản QR đã đủ thông tin hiển thị</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Cần điền Ngân hàng, Chủ TK &amp; Ảnh QR bên dưới để hiển thị QR cho khách</span>
+                    }
+                </div>
+
+                <div class="row g-3">
+                    @foreach (var pm in Model.PaymentMethods)
+                    {
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded-3 p-3 d-flex justify-content-between align-items-center bg-light">
+                                <div>
+                                    <span class="badge bg-coffee font-monospace mb-1">@pm.Code</span>
+                                    <div class="fw-bold">@pm.Name</div>
+                                </div>
+                                <form method="post" action="/admin/settings/toggle-payment">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="code" value="@pm.Code" />
+                                    <input type="hidden" name="isActive" value="@((!pm.IsActive).ToString().ToLowerInvariant())" />
+                                    <button type="submit" class="btn btn-sm @(pm.IsActive ? "btn-success" : "btn-outline-secondary")" style="min-height: 36px;">
+                                        <i class="bi @(pm.IsActive ? "bi-toggle-on" : "bi-toggle-off") me-1"></i>@(pm.IsActive ? "Đang bật" : "Đang tắt")
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <hr class="mt-4 mb-0" />
+            </div>
+        }
+
+        <form method="post" action="/admin/settings/save" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ActiveTab" id="activeTabInput" value="@activeTab" />
+
+            <div class="tab-content">
+                <!-- TAB 1: THÔNG TIN QUÁN & GIỜ MỞ CỬA & LOGO -->
+                <div class="tab-pane fade @(activeTab == "tab-store" ? "show active" : "")" id="pane-store" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Tên quán thương hiệu <span class="text-danger">*</span></label>
+                            <input type="text" name="ShopName" class="form-control fw-bold" value="@f.ShopName" required maxlength="120" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Loại hình kinh doanh</label>
+                            <input type="text" name="BusinessType" class="form-control" value="@f.BusinessType" maxlength="100" placeholder="Cafe & Bakery" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Slogan / Khẩu hiệu</label>
+                            <input type="text" name="Slogan" class="form-control" value="@f.Slogan" maxlength="200" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Khung giờ mở cửa</label>
+                            <input type="text" name="OpeningHours" class="form-control" value="@f.OpeningHours" maxlength="150" placeholder="07:00 – 22:00 hằng ngày" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Địa chỉ cửa hàng</label>
+                            <input type="text" name="Address" class="form-control" value="@f.Address" maxlength="300" />
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label class="form-label fw-semibold">Tải lên Logo thương hiệu <small class="text-muted fw-normal">(JPG, PNG, WEBP &le; 2MB)</small></label>
+                            <input type="file" name="LogoFile" id="logoFileInput" class="form-control" accept=".jpg,.jpeg,.png,.webp" />
+                        </div>
+                        <div class="col-12 col-md-4 d-flex align-items-center">
+                            <div class="border rounded-3 p-2 bg-cream d-flex align-items-center gap-3 w-100">
+                                @if (!string.IsNullOrWhiteSpace(f.ExistingLogoUrl))
+                                {
+                                    <img src="@f.ExistingLogoUrl" id="logoPreviewImg" alt="Logo" class="rounded" style="height: 54px; width: 54px; object-fit: contain;" />
+                                }
+                                else
+                                {
+                                    <img src="/images/seed/default-drink.svg" id="logoPreviewImg" alt="Logo" class="rounded" style="height: 54px; width: 54px; object-fit: contain;" />
+                                }
+                                <small class="text-muted">Xem trước Logo</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: MÀU THƯƠNG HIỆU (LIVE CSS VARIABLES) -->
+                <div class="tab-pane fade @(activeTab == "tab-brand" ? "show active" : "")" id="pane-brand" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <p class="text-muted small mb-0">Chọn bảng màu bên dưới để xem trước trực tiếp (Live CSS Variables) ngay trên giao diện hiện tại trước khi nhấn Lưu.</p>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetBrandColors">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục màu Đạt Mộc gốc
+                        </button>
+                    </div>
+
+                    <div class="row g-4 align-items-center">
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 border rounded-3 bg-white">
+                                <label class="form-label fw-semibold">Màu Chủ đạo (Primary Color)</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" name="PrimaryColor" id="primaryColorInput" class="form-control form-control-color" value="@f.PrimaryColor" style="width: 56px; height: 44px;" />
+                                    <input type="text" id="primaryColorHex" class="form-control font-monospace" value="@f.PrimaryColor" readonly />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 border rounded-3 bg-white">
+                                <label class="form-label fw-semibold">Màu Nền Kem (Secondary Color)</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" name="SecondaryColor" id="secondaryColorInput" class="form-control form-control-color" value="@f.SecondaryColor" style="width: 56px; height: 44px;" />
+                                    <input type="text" id="secondaryColorHex" class="form-control font-monospace" value="@f.SecondaryColor" readonly />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 border rounded-3 bg-white">
+                                <label class="form-label fw-semibold">Màu Nhấn (Accent Color)</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" name="AccentColor" id="accentColorInput" class="form-control form-control-color" value="@f.AccentColor" style="width: 56px; height: 44px;" />
+                                    <input type="text" id="accentColorHex" class="form-control font-monospace" value="@f.AccentColor" readonly />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-4 rounded-3 border bg-cream d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                <div>
+                                    <h5 class="fw-bold text-coffee mb-1">Xem trước Bảng màu Thương hiệu @f.ShopName</h5>
+                                    <div class="small text-muted">Nền Secondary • Chữ tiêu đề Primary • Nút nhấn CTA Accent</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <span class="btn btn-coffee">Nút Primary</span>
+                                    <span class="btn btn-accent text-white">Nút Accent</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: LIÊN HỆ, MXH & GOOGLE MAPS -->
+                <div class="tab-pane fade @(activeTab == "tab-contact" ? "show active" : "")" id="pane-contact" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Số điện thoại Hotline</label>
+                            <input type="text" name="Phone" class="form-control" value="@f.Phone" maxlength="30" placeholder="0900 000 000" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Email chăm sóc khách hàng</label>
+                            <input type="email" name="Email" class="form-control" value="@f.Email" maxlength="120" placeholder="contact@datmoccoffee.vn" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-facebook text-primary me-1"></i>Đường dẫn Facebook Fanpage</label>
+                            <input type="url" name="FacebookUrl" class="form-control" value="@f.FacebookUrl" placeholder="https://facebook.com/..." />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-chat-dots-fill text-info me-1"></i>Đường dẫn Zalo OA</label>
+                            <input type="url" name="ZaloUrl" class="form-control" value="@f.ZaloUrl" placeholder="https://zalo.me/..." />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold"><i class="bi bi-map-fill text-success me-1"></i>Google Maps Embed URL</label>
+                            <input type="text" name="GoogleMapsEmbedUrl" class="form-control font-monospace small" value="@f.GoogleMapsEmbedUrl"
+                                   placeholder="https://www.google.com/maps/embed?pb=..." />
+                            <div class="form-text">Có thể dán URL <code>https://www.google.com/maps/embed?...</code> hoặc dán nguyên thẻ <code>&lt;iframe&gt;</code> từ Google Maps, hệ thống sẽ tự trích xuất an toàn.</div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(f.GoogleMapsEmbedUrl))
+                        {
+                            <div class="col-12">
+                                <iframe src="@f.GoogleMapsEmbedUrl" class="w-100 rounded-3 border" style="height: 220px;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- TAB 4: THÔNG TIN CHUYỂN KHOẢN NGÂN HÀNG & ẢNH QR -->
+                <div class="tab-pane fade @(activeTab == "tab-payment" ? "show active" : "")" id="pane-payment" role="tabpanel">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-bank2 text-coffee me-2"></i>Thông tin Tài khoản Nhận Chuyển khoản &amp; Ảnh Mã QR</h6>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Tên Ngân hàng</label>
+                            <input type="text" name="BankName" class="form-control" value="@f.BankName" maxlength="120" placeholder="VD: Vietcombank" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Số Tài khoản</label>
+                            <input type="text" name="BankAccountNumber" class="form-control font-monospace fw-bold" value="@f.BankAccountNumber" maxlength="50" placeholder="0123456789" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold">Tên Chủ Tài khoản (In hoa)</label>
+                            <input type="text" name="BankAccountHolder" class="form-control text-uppercase fw-bold" value="@f.BankAccountHolder" maxlength="120" placeholder="DAT MOC COFFEE" />
+                        </div>
+                        <div class="col-12 col-md-7">
+                            <label class="form-label fw-semibold">Tải lên Ảnh Mã QR Thanh toán <small class="text-muted fw-normal">(JPG, PNG, WEBP &le; 2MB)</small></label>
+                            <input type="file" name="QrImageFile" id="qrFileInput" class="form-control" accept=".jpg,.jpeg,.png,.webp" />
+                            <div class="form-text">Phương thức thanh toán QR chỉ hiển thị ở trang Đặt hàng khi đã có đủ Tên ngân hàng, Chủ tài khoản và Ảnh mã QR.</div>
+                        </div>
+                        <div class="col-12 col-md-5 text-center">
+                            <div class="border rounded-3 p-3 bg-light">
+                                @if (!string.IsNullOrWhiteSpace(f.ExistingQrImageUrl))
+                                {
+                                    <img src="@f.ExistingQrImageUrl" id="qrPreviewImg" alt="QR Code" class="rounded border bg-white p-1" style="max-height: 160px; object-fit: contain;" />
+                                }
+                                else
+                                {
+                                    <img src="" id="qrPreviewImg" alt="QR Code" class="rounded border bg-white p-1" style="max-height: 160px; display:none;" />
+                                    <div id="qrEmptyHint" class="text-muted small py-4"><i class="bi bi-qr-code fs-2 d-block mb-1"></i>Chưa tải lên ảnh mã QR</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: GIAO HÀNG, TÍCH ĐIỂM & ĐẶT BÀN -->
+                <div class="tab-pane fade @(activeTab == "tab-operations" ? "show active" : "")" id="pane-operations" role="tabpanel">
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 border rounded-3 h-100">
+                                <h6 class="fw-bold text-coffee mb-3"><i class="bi bi-bicycle me-2"></i>Chính sách Phí Giao hàng (Delivery)</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Phí giao hàng mặc định (₫)</label>
+                                    <div class="input-group">
+                                        <input type="number" name="ShippingFee" class="form-control fw-bold" value="@f.ShippingFee.ToString("0")" min="0" step="1000" />
+                                        <span class="input-group-text">₫</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label fw-semibold">Ngưỡng miễn phí giao hàng (₫)</label>
+                                    <div class="input-group">
+                                        <input type="number" name="FreeShippingThreshold" class="form-control fw-bold" value="@f.FreeShippingThreshold.ToString("0")" min="0" step="5000" />
+                                        <span class="input-group-text">₫</span>
+                                    </div>
+                                    <div class="form-text">Đơn giao hàng có tiền hàng sau giảm giá &ge; mức này sẽ được miễn phí ship (0 ₫).</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="p-3 border rounded-3 h-100">
+                                <h6 class="fw-bold text-coffee mb-3"><i class="bi bi-award-fill me-2"></i>Tích điểm Thành viên &amp; Giữ bàn Đặt trước</h6>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold small">Mỗi bao nhiêu VNĐ = 1 điểm</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="LoyaltyEarnPerVnd" class="form-control" value="@f.LoyaltyEarnPerVnd" min="1000" step="1000" />
+                                            <span class="input-group-text">₫</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold small">Giá trị quy đổi 1 điểm</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" name="LoyaltyRedeemValueVnd" class="form-control" value="@f.LoyaltyRedeemValueVnd" min="1" />
+                                            <span class="input-group-text">₫</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="form-label fw-semibold">Thời gian giữ bàn đặt trước (phút)</label>
+                                    <div class="input-group">
+                                        <input type="number" name="ReservationHoldMinutes" class="form-control fw-bold" value="@f.ReservationHoldMinutes" min="5" max="240" />
+                                        <span class="input-group-text">phút</span>
+                                    </div>
+                                    <div class="form-text">Bàn có lịch đặt trước đã xác nhận trong khung giờ này sẽ tự hiển thị trạng thái <strong>Đã đặt trước</strong> trên sơ đồ 3D.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-top mt-4 pt-3 d-flex justify-content-end">
+                <button type="submit" class="btn btn-coffee px-4">
+                    <i class="bi bi-floppy-fill me-2"></i>Lưu toàn bộ Cấu hình Hệ thống
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const activeTabInput = document.getElementById('activeTabInput');
+            const pmQuickPanel = document.getElementById('paymentMethodsQuickPanel');
+
+            document.querySelectorAll('#settingsTabs button[data-tab-key]').forEach(btn => {
+                btn.addEventListener('shown.bs.tab', () => {
+                    const key = btn.dataset.tabKey;
+                    if (activeTabInput) activeTabInput.value = key;
+                    if (pmQuickPanel) pmQuickPanel.style.display = (key === 'tab-payment') ? 'block' : 'none';
+                });
+            });
+
+            // Live CSS Variables cho Tab Màu thương hiệu
+            const pIn = document.getElementById('primaryColorInput');
+            const sIn = document.getElementById('secondaryColorInput');
+            const aIn = document.getElementById('accentColorInput');
+
+            function syncLiveColors() {
+                if (pIn) {
+                    document.documentElement.style.setProperty('--brand-primary', pIn.value);
+                    document.getElementById('primaryColorHex').value = pIn.value.toUpperCase();
+                }
+                if (sIn) {
+                    document.documentElement.style.setProperty('--brand-secondary', sIn.value);
+                    document.getElementById('secondaryColorHex').value = sIn.value.toUpperCase();
+                }
+                if (aIn) {
+                    document.documentElement.style.setProperty('--brand-accent', aIn.value);
+                    document.getElementById('accentColorHex').value = aIn.value.toUpperCase();
+                }
+            }
+
+            pIn?.addEventListener('input', syncLiveColors);
+            sIn?.addEventListener('input', syncLiveColors);
+            aIn?.addEventListener('input', syncLiveColors);
+
+            document.getElementById('btnResetBrandColors')?.addEventListener('click', () => {
+                if (pIn) pIn.value = '#6F4E37';
+                if (sIn) sIn.value = '#F6EFE7';
+                if (aIn) aIn.value = '#C8782A';
+                syncLiveColors();
+            });
+
+            // Preview Logo & QR Image
+            document.getElementById('logoFileInput')?.addEventListener('change', function () {
+                const file = this.files?.[0];
+                if (!file) return;
+                const r = new FileReader();
+                r.onload = e => {
+                    const img = document.getElementById('logoPreviewImg');
+                    if (img && e.target?.result) img.src = e.target.result;
+                };
+                r.readAsDataURL(file);
+            });
+
+            document.getElementById('qrFileInput')?.addEventListener('change', function () {
+                const file = this.files?.[0];
+                if (!file) return;
+                const r = new FileReader();
+                r.onload = e => {
+                    const img = document.getElementById('qrPreviewImg');
+                    const hint = document.getElementById('qrEmptyHint');
+                    if (img && e.target?.result) {
+                        img.src = e.target.result;
+                        img.style.display = 'inline-block';
+                    }
+                    if (hint) hint.style.display = 'none';
+                };
+                r.readAsDataURL(file);
+            });
+        })();
+    </script>
+}

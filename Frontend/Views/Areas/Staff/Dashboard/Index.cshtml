@@ -1,0 +1,480 @@
+@using CoffeeShop.Areas.Staff.Models
+@model StaffDashboardVm
+@{
+    ViewData["Title"] = "Bảng điều hành ca trực";
+}
+
+<!-- Banner thông báo đơn mới thời gian thực (SignalR) -->
+<div id="dashboardLiveBanner" class="alert alert-warning border-warning shadow-sm d-none align-items-center justify-content-between mb-3" role="alert">
+    <div>
+        <i class="bi bi-bell-fill me-2"></i>
+        <strong>Cập nhật đơn hàng mới!</strong>
+        <span id="dashboardLiveBannerText" class="ms-1">Hệ thống vừa ghi nhận thay đổi trạng thái đơn hàng.</span>
+    </div>
+    <button type="button" class="btn btn-sm btn-coffee" onclick="location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i> Làm mới ngay
+    </button>
+</div>
+
+<!-- Header chào ca & thao tác nhanh Touch >= 48px -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+        <h1 class="h4 fw-bold mb-1">
+            <i class="bi bi-grid-1x2-fill text-coffee me-2"></i>Điều hành ca trực – @Model.StaffName
+        </h1>
+        <div class="text-muted small">
+            Phạm vi thống kê: <strong>@Model.PeriodLabel</strong>
+            @if (Model.ActiveShift != null)
+            {
+                <span class="badge bg-success ms-2"><i class="bi bi-broadcast me-1"></i>Đang mở ca #@Model.ActiveShift.Id</span>
+            }
+            else
+            {
+                <span class="badge bg-secondary ms-2"><i class="bi bi-pause-circle me-1"></i>Chưa mở ca cá nhân</span>
+            }
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/staff/pos" class="btn btn-accent text-white staff-touch-btn px-3 shadow-sm">
+            <i class="bi bi-calculator-fill"></i>
+            <span>Mở POS bán hàng</span>
+        </a>
+        <a href="/staff/tables" class="btn btn-coffee staff-touch-btn px-3 shadow-sm">
+            <i class="bi bi-box-fill"></i>
+            <span>Sơ đồ Bàn 3D</span>
+        </a>
+        @if (Model.ActiveShift == null)
+        {
+            <button type="button" class="btn btn-success staff-touch-btn px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#openShiftModal">
+                <i class="bi bi-play-circle-fill"></i>
+                <span>Mở ca làm việc</span>
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-outline-danger bg-white staff-touch-btn px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#closeShiftModal">
+                <i class="bi bi-stop-circle-fill"></i>
+                <span>Đóng ca / Kết két</span>
+            </button>
+        }
+    </div>
+</div>
+
+<!-- Thẻ Trạng thái Ca trực (Mở ca / Đóng ca P1) -->
+<div class="stat-card mb-3 border-start border-4" style="border-left-color: @(Model.ActiveShift != null ? "#10B981" : "#6F4E37") !important;">
+    @if (Model.ActiveShift != null)
+    {
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <div class="small text-muted text-uppercase fw-semibold">Ca trực đang hoạt động</div>
+                <div class="fw-bold fs-5 text-coffee">Ca #@Model.ActiveShift.Id – Mở lúc @FormatHelper.DateTimeVn(Model.ActiveShift.OpenedAt)</div>
+                @if (!string.IsNullOrWhiteSpace(Model.ActiveShift.Note))
+                {
+                    <div class="small text-secondary fst-italic mt-1"><i class="bi bi-chat-left-text me-1"></i>@Model.ActiveShift.Note</div>
+                }
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="small text-muted">Tiền mặt đầu ca</div>
+                <div class="fw-bold fs-6">@FormatHelper.Vnd(Model.ActiveShift.OpeningCash)</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Thu tiền mặt trong ca</div>
+                <div class="fw-bold fs-6 text-success">+@FormatHelper.Vnd(Model.LiveCashCollected)</div>
+            </div>
+            <div class="col-md-3 text-md-end">
+                <div class="small text-muted">Tiền mặt dự kiến trong két</div>
+                <div class="fw-bold fs-5 text-coffee">@FormatHelper.Vnd(Model.LiveExpectedCash)</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <div class="fw-bold text-dark">
+                    <i class="bi bi-cash-coin text-coffee me-1"></i>Bạn chưa mở ca làm việc hiện tại
+                </div>
+                <div class="small text-muted">
+                    Mở ca giúp hệ thống tự động gắn các đơn POS vào ca trực và đối soát tiền mặt két thu ngân cuối ca chính xác.
+                </div>
+                @if (Model.LastClosedShiftToday != null)
+                {
+                    var lastDiff = Model.LastClosedShiftToday.Difference ?? 0m;
+                    <div class="small mt-1">
+                        <span class="badge bg-light text-dark border">
+                            Ca gần nhất hôm nay (#@Model.LastClosedShiftToday.Id) đóng lúc @FormatHelper.DateTimeVn(Model.LastClosedShiftToday.ClosedAt!.Value, "HH:mm")
+                            • Dự kiến: @FormatHelper.Vnd(Model.LastClosedShiftToday.ExpectedCash)
+                            • Thực đếm: @FormatHelper.Vnd(Model.LastClosedShiftToday.CountedCash ?? 0)
+                            • Chênh lệch:
+                            <strong class="@(lastDiff < 0 ? "text-danger" : "text-success")">
+                                @(lastDiff > 0 ? "+" : "")@FormatHelper.Vnd(lastDiff)
+                            </strong>
+                        </span>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-success staff-touch-btn px-3" data-bs-toggle="modal" data-bs-target="#openShiftModal">
+                <i class="bi bi-door-open-fill"></i> Bắt đầu mở ca
+            </button>
+        </div>
+    }
+</div>
+
+<!-- 5 Thẻ chỉ số vận hành ca (KPIs) -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+        <div class="stat-card h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="text-muted small fw-semibold">Tổng đơn trong ca</span>
+                <span class="rounded-3 bg-cream text-coffee d-inline-flex align-items-center justify-content-center" style="width:38px;height:38px;">
+                    <i class="bi bi-receipt"></i>
+                </span>
+            </div>
+            <div class="fs-3 fw-bold">@Model.TotalOrdersInShift</div>
+            <div class="small text-muted">@Model.PeriodLabel</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg">
+        <a href="/staff/orders?status=Pending" class="text-decoration-none text-dark d-block h-100">
+            <div class="stat-card h-100 border-warning">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold">Đơn chờ xác nhận</span>
+                    <span class="rounded-3 d-inline-flex align-items-center justify-content-center text-white" style="width:38px;height:38px;background:#F59E0B;">
+                        <i class="bi bi-hourglass-split"></i>
+                    </span>
+                </div>
+                <div class="fs-3 fw-bold" style="color:#D97706;">@Model.PendingOrdersCount</div>
+                <div class="small text-muted">Nhấn để xác nhận ngay &rarr;</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-lg">
+        <a href="/staff/orders" class="text-decoration-none text-dark d-block h-100">
+            <div class="stat-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold">Đơn đang xử lý</span>
+                    <span class="rounded-3 d-inline-flex align-items-center justify-content-center text-white" style="width:38px;height:38px;background:#8B5CF6;">
+                        <i class="bi bi-cup-hot-fill"></i>
+                    </span>
+                </div>
+                <div class="fs-3 fw-bold" style="color:#7C3AED;">@Model.ProcessingOrdersCount</div>
+                <div class="small text-muted">Đã xác nhận / Pha chế / Giao</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-lg">
+        <a href="/staff/orders?status=Completed" class="text-decoration-none text-dark d-block h-100">
+            <div class="stat-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold">Đơn hoàn thành</span>
+                    <span class="rounded-3 d-inline-flex align-items-center justify-content-center text-white" style="width:38px;height:38px;background:#10B981;">
+                        <i class="bi bi-patch-check-fill"></i>
+                    </span>
+                </div>
+                <div class="fs-3 fw-bold text-success">@Model.CompletedOrdersCount</div>
+                <div class="small text-muted">Hoàn tất phục vụ trong kỳ</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-12 col-lg">
+        @if (Model.CanViewRevenue)
+        {
+            <div class="stat-card h-100 bg-cream border-0">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-coffee small fw-bold">Doanh thu ca</span>
+                    <span class="rounded-3 bg-coffee text-white d-inline-flex align-items-center justify-content-center" style="width:38px;height:38px;">
+                        <i class="bi bi-cash-stack"></i>
+                    </span>
+                </div>
+                <div class="fs-4 fw-bold text-coffee">@FormatHelper.Vnd(Model.ShiftRevenue ?? 0m)</div>
+                <div class="small text-muted">Tính đơn Hoàn thành &amp; Đã thu tiền</div>
+            </div>
+        }
+        else
+        {
+            <div class="stat-card h-100 bg-light text-muted d-flex flex-column justify-content-center">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-lock-fill fs-5 text-secondary"></i>
+                    <span class="small fw-semibold">Doanh thu ca</span>
+                </div>
+                <div class="small">Chưa được cấp quyền xem doanh thu ca</div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Bảng 10 đơn hàng mới nhất -->
+<div class="stat-card">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h2 class="h5 fw-bold mb-0"><i class="bi bi-clock-history text-coffee me-2"></i>10 Đơn hàng gần nhất</h2>
+            <small class="text-muted">Tự động cập nhật thời gian thực qua SignalR khi có đơn mới</small>
+        </div>
+        <a href="/staff/orders" class="btn btn-outline-coffee staff-touch-btn px-3">
+            <span>Quản lý tất cả đơn</span>
+            <i class="bi bi-arrow-right"></i>
+        </a>
+    </div>
+
+    @if (Model.LatestOrders.Count == 0)
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+            Chưa có đơn hàng nào được ghi nhận.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Mã đơn</th>
+                        <th>Thời gian</th>
+                        <th>Khách hàng</th>
+                        <th>Hình thức / Bàn</th>
+                        <th class="text-center">Số món</th>
+                        <th class="text-end">Tổng tiền</th>
+                        <th>Thanh toán</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model.LatestOrders)
+                    {
+                        <tr>
+                            <td class="fw-bold">
+                                <a href="/staff/orders/detail/@o.Id" class="text-coffee text-decoration-none">@o.Code</a>
+                                <span class="badge bg-light text-secondary border ms-1">@o.Source.GetDisplayName()</span>
+                            </td>
+                            <td class="small text-muted text-nowrap">@FormatHelper.DateTimeVn(o.CreatedAt)</td>
+                            <td>
+                                <div class="fw-semibold">@o.CustomerName</div>
+                                @if (!string.IsNullOrWhiteSpace(o.Phone))
+                                {
+                                    <div class="small text-muted">@o.Phone</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="fw-medium">@o.OrderType.GetDisplayName()</span>
+                                @if (!string.IsNullOrWhiteSpace(o.TableCode))
+                                {
+                                    <span class="badge bg-dark ms-1">Bàn @o.TableCode</span>
+                                }
+                            </td>
+                            <td class="text-center fw-semibold">@o.ItemCount</td>
+                            <td class="text-end fw-bold text-coffee text-nowrap">@FormatHelper.Vnd(o.Total)</td>
+                            <td>
+                                @if (o.PaymentStatus == PaymentStatus.Paid)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Đã thu (@o.PaymentMethod)
+                                    </span>
+                                }
+                                else if (o.PaymentStatus == PaymentStatus.Refunded)
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border">Đã hoàn tiền</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning-subtle text-dark border border-warning-subtle">
+                                        Chưa thu (@o.PaymentMethod)
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <span class="order-status-badge" style="background-color: @o.Status.GetBadgeColor();">
+                                    <i class="bi @o.Status.GetStatusIcon()"></i>
+                                    @o.Status.GetDisplayName()
+                                </span>
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a href="/staff/orders/detail/@o.Id" class="btn btn-sm btn-coffee staff-touch-btn px-3">
+                                    <i class="bi bi-eye-fill"></i> Xử lý
+                                </a>
+                                <a href="/staff/orders/receipt/@o.Id" class="btn btn-sm btn-outline-secondary staff-touch-btn px-2" title="In hóa đơn">
+                                    <i class="bi bi-printer"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Modal Mở ca làm việc -->
+@if (Model.ActiveShift == null)
+{
+    <div class="modal fade" id="openShiftModal" tabindex="-1" aria-labelledby="openShiftModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form method="post" action="/staff/dashboard/open-shift">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header bg-coffee text-white">
+                        <h5 class="modal-title fw-bold" id="openShiftModalLabel">
+                            <i class="bi bi-play-circle-fill me-2"></i>Mở ca làm việc mới
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="openingCashInput">Tiền mặt đầu ca trong két (₫)</label>
+                            <input type="number" class="form-control form-control-lg fw-bold" id="openingCashInput" name="OpeningCash" value="500000" min="0" step="1000" required />
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-coffee" onclick="document.getElementById('openingCashInput').value = 500000">500.000 ₫</button>
+                                <button type="button" class="btn btn-sm btn-outline-coffee" onclick="document.getElementById('openingCashInput').value = 1000000">1.000.000 ₫</button>
+                                <button type="button" class="btn btn-sm btn-outline-coffee" onclick="document.getElementById('openingCashInput').value = 2000000">2.000.000 ₫</button>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold" for="openShiftNote">Ghi chú đầu ca (tùy chọn)</label>
+                            <textarea class="form-control" id="openShiftNote" name="Note" rows="2" maxlength="200" placeholder="Ví dụ: Ca sáng bàn giao đủ tiền lẻ..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary staff-touch-btn px-3" data-bs-dismiss="modal">Đóng</button>
+                        <button type="submit" class="btn btn-success staff-touch-btn px-4">
+                            <i class="bi bi-check2-circle"></i> Xác nhận Mở ca
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Đóng ca / Kết két -->
+@if (Model.ActiveShift != null)
+{
+    <div class="modal fade" id="closeShiftModal" tabindex="-1" aria-labelledby="closeShiftModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form method="post" action="/staff/dashboard/close-shift">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title fw-bold" id="closeShiftModalLabel">
+                            <i class="bi bi-calculator me-2"></i>Kết sổ &amp; Đóng ca #@Model.ActiveShift.Id
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (Model.OpenOrdersCount > 0)
+                        {
+                            <div class="alert alert-warning d-flex align-items-start gap-2 small">
+                                <i class="bi bi-exclamation-triangle-fill fs-5 text-warning flex-shrink-0"></i>
+                                <div>
+                                    <strong>Cảnh báo đơn đang mở:</strong> Hiện trên hệ thống vẫn còn <strong>@Model.OpenOrdersCount đơn hàng</strong> chưa hoàn thành hoặc chưa thanh toán. Vui lòng kiểm tra kỹ bàn &amp; đơn trước khi kết sổ đóng ca!
+                                </div>
+                            </div>
+                        }
+
+                        <div class="rounded-3 bg-cream p-3 mb-3 border">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Tiền mặt đầu ca:</span>
+                                <strong>@FormatHelper.Vnd(Model.ActiveShift.OpeningCash)</strong>
+                            </div>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Tiền mặt thu trong ca (CASH - Đã thu):</span>
+                                <strong class="text-success">+@FormatHelper.Vnd(Model.LiveCashCollected)</strong>
+                            </div>
+                            <hr class="my-2" />
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-coffee">Tiền mặt dự kiến trong két:</span>
+                                <span class="fs-5 fw-bold text-coffee" id="expectedCashDisplay" data-expected="@Math.Round(Model.LiveExpectedCash, 0)">
+                                    @FormatHelper.Vnd(Model.LiveExpectedCash)
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="countedCashInput">Tiền mặt thực đếm cuối ca (₫)</label>
+                            <input type="number" class="form-control form-control-lg fw-bold" id="countedCashInput" name="CountedCash"
+                                   value="@Math.Round(Model.LiveExpectedCash, 0)" min="0" step="1000" required />
+                            <div class="mt-2 small d-flex justify-content-between align-items-center">
+                                <span class="text-muted">Chênh lệch (Thực đếm - Dự kiến):</span>
+                                <strong id="shiftDiffPreview" class="text-success">0 ₫ (Khớp két)</strong>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold" for="closeShiftNote">Ghi chú bàn giao cuối ca</label>
+                            <textarea class="form-control" id="closeShiftNote" name="Note" rows="2" maxlength="200" placeholder="Ghi chú lý do chênh lệch (nếu có) hoặc bàn giao ca sau..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary staff-touch-btn px-3" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-danger staff-touch-btn px-4">
+                            <i class="bi bi-lock-fill"></i> Xác nhận Đóng ca
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            const fmtVnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + ' ₫';
+
+            // Tính chênh lệch tiền mặt trực tiếp trong Modal Đóng ca
+            const countedInput = document.getElementById('countedCashInput');
+            const expectedEl = document.getElementById('expectedCashDisplay');
+            const diffEl = document.getElementById('shiftDiffPreview');
+
+            if (countedInput && expectedEl && diffEl) {
+                const expectedVal = parseFloat(expectedEl.dataset.expected || '0') || 0;
+                const updateDiff = () => {
+                    const counted = parseFloat(countedInput.value || '0') || 0;
+                    const diff = counted - expectedVal;
+                    if (diff === 0) {
+                        diffEl.textContent = '0 ₫ (Khớp két)';
+                        diffEl.className = 'text-success fw-bold';
+                    } else if (diff > 0) {
+                        diffEl.textContent = '+' + fmtVnd(diff) + ' (Dư két)';
+                        diffEl.className = 'text-primary fw-bold';
+                    } else {
+                        diffEl.textContent = '-' + fmtVnd(Math.abs(diff)) + ' (Thiếu két)';
+                        diffEl.className = 'text-danger fw-bold';
+                    }
+                };
+                countedInput.addEventListener('input', updateDiff);
+                updateDiff();
+            }
+
+            // Lắng nghe SignalR đơn mới: tự động reload nếu nhân viên không đang mở modal nhập liệu
+            function handleRealtimeRefresh(text) {
+                const isModalOpen = !!document.querySelector('.modal.show');
+                if (!isModalOpen) {
+                    setTimeout(() => location.reload(), 900);
+                } else {
+                    const banner = document.getElementById('dashboardLiveBanner');
+                    const txt = document.getElementById('dashboardLiveBannerText');
+                    if (txt && text) txt.textContent = text;
+                    if (banner) {
+                        banner.classList.remove('d-none');
+                        banner.classList.add('d-flex');
+                    }
+                }
+            }
+
+            if (window.DatMocRealtime) {
+                window.DatMocRealtime.onNewOrder((payload) => {
+                    handleRealtimeRefresh(`Đơn mới ${payload?.code || ''} vừa được tạo.`);
+                });
+                window.DatMocRealtime.onStatusChanged((payload) => {
+                    handleRealtimeRefresh(`Đơn ${payload?.code || ''} vừa đổi trạng thái.`);
+                });
+            }
+        })();
+    </script>
+}

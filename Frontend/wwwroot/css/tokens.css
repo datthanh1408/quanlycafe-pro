@@ -1,0 +1,57 @@
+/* ==========================================================================
+   DESIGN TOKENS – ĐẠT MỘC COFFEE (Mục 9 Design System)
+   ========================================================================== */
+:root {
+    /* Màu thương hiệu (có thể override động từ SystemSetting ở Layout) */
+    --brand-primary: #6F4E37;
+    --brand-primary-dark: #4E3524;
+    --brand-primary-rgb: 111, 78, 55;
+    --brand-secondary: #F6EFE7;
+    --brand-accent: #C8782A;
+    --brand-accent-dark: #A65F1B;
+
+    /* Bề mặt & Văn bản */
+    --surface-bg: #FAF6F1;
+    --surface-card: #FFFFFF;
+    --surface-dark: #231710;
+    --text-primary: #1F1610;
+    --text-secondary: #5C4B3E;
+    --text-muted: #857467;
+    --border-subtle: #E8DDD1;
+
+    /* Màu trạng thái đơn hàng thống nhất ở cả 3 khu vực (Mục 9) */
+    --status-pending: #F59E0B;     /* Chờ xác nhận - Hổ phách */
+    --status-confirmed: #3B82F6;   /* Đã xác nhận - Xanh dương */
+    --status-brewing: #8B5CF6;     /* Đang pha chế - Tím */
+    --status-ready: #10B981;       /* Sẵn sàng nhận - Xanh lá */
+    --status-delivering: #06B6D4;  /* Đang giao - Xanh ngọc */
+    --status-completed: #64748B;   /* Hoàn thành - Xám đá */
+    --status-cancelled: #EF4444;   /* Đã hủy - Đỏ */
+
+    /* Màu trạng thái bàn (Mục 9) */
+    --table-available: #10B981;
+    --table-occupied: #F59E0B;
+    --table-reserved: #3B82F6;
+
+    /* Font chữ (Mục 3.1 & 9) */
+    --font-sans: 'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+    /* Khoảng cách theo thang 4/8px, bo góc & đổ bóng */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+
+    --shadow-xs: 0 1px 3px rgba(35, 23, 16, 0.06);
+    --shadow-sm: 0 4px 12px rgba(35, 23, 16, 0.07);
+    --shadow-md: 0 10px 28px rgba(35, 23, 16, 0.11);
+}
+

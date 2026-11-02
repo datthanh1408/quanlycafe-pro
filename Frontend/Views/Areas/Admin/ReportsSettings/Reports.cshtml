@@ -1,0 +1,361 @@
+@using System.Text.Json
+@using CoffeeShop.Areas.Admin.Models
+@model ReportsAdminViewModel
+@{
+    ViewData["Title"] = "Báo cáo Kinh doanh & Xuất Excel";
+    var s = Model.Summary;
+
+    var exportUrl = $"/admin/reports/export-excel?preset=custom&fromDate={Model.FromDate:yyyy-MM-dd}&toDate={Model.ToDate:yyyy-MM-dd}";
+
+    var revLabelsJson = JsonSerializer.Serialize(s.RevenueSeries.Select(x => x.Label));
+    var revValuesJson = JsonSerializer.Serialize(s.RevenueSeries.Select(x => x.Revenue));
+    var revOrdersJson = JsonSerializer.Serialize(s.RevenueSeries.Select(x => x.OrderCount));
+}
+
+<!-- Tiêu đề khi in ra PDF / giấy -->
+<div class="d-none d-print-block mb-4 border-bottom pb-3">
+    <h3 class="fw-bold mb-1">BÁO CÁO TỔNG HỢP KINH DOANH – ĐẠT MỘC COFFEE</h3>
+    <div>Kỳ báo cáo: <strong>@Model.FromDate.ToString("dd/MM/yyyy") – @Model.ToDate.ToString("dd/MM/yyyy")</strong> • Ngày xuất: @FormatHelper.VnNow().ToString("dd/MM/yyyy HH:mm")</div>
+</div>
+
+<!-- Header & Bộ lọc kỳ báo cáo -->
+<div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4 no-print">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee"><i class="bi bi-bar-chart-line-fill me-2"></i>Báo cáo Kinh doanh, Nhân sự &amp; Kho</h4>
+        <div class="text-muted small">
+            Kỳ phân tích: <strong class="text-dark">@Model.FromDate.ToString("dd/MM/yyyy") – @Model.ToDate.ToString("dd/MM/yyyy")</strong>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <a href="@exportUrl" class="btn btn-success fw-semibold px-3" style="min-height: 40px;">
+            <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Báo Cáo Tổng Hợp Excel (.xlsx)
+        </a>
+        <button type="button" class="btn btn-outline-dark bg-white fw-semibold px-3" style="min-height: 40px;" onclick="window.print()">
+            <i class="bi bi-printer-fill me-1"></i>In / Xuất PDF
+        </button>
+    </div>
+</div>
+
+<!-- Thanh chọn Preset Tháng/Năm & Khoảng ngày -->
+<div class="card border-0 shadow-sm mb-4 no-print">
+    <div class="card-body py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="btn-group" role="group">
+            <a href="/admin/reports?preset=today" class="btn btn-sm @(Model.Preset == "today" ? "btn-coffee" : "btn-outline-secondary")">Hôm nay</a>
+            <a href="/admin/reports?preset=7d" class="btn btn-sm @(Model.Preset == "7d" ? "btn-coffee" : "btn-outline-secondary")">7 ngày qua</a>
+            <a href="/admin/reports?preset=month" class="btn btn-sm @(Model.Preset == "month" ? "btn-coffee" : "btn-outline-secondary")">Tháng này</a>
+            <a href="/admin/reports?preset=year" class="btn btn-sm @(Model.Preset == "year" ? "btn-coffee" : "btn-outline-secondary")">Năm nay</a>
+        </div>
+
+        <form method="get" action="/admin/reports" class="d-flex flex-wrap align-items-center gap-2">
+            <input type="hidden" name="preset" value="custom" />
+            <label class="small fw-semibold text-muted">Từ:</label>
+            <input type="date" name="fromDate" class="form-control form-control-sm" style="width: auto;" value="@Model.FromDate.ToString("yyyy-MM-dd")" />
+            <label class="small fw-semibold text-muted">Đến:</label>
+            <input type="date" name="toDate" class="form-control form-control-sm" style="width: auto;" value="@Model.ToDate.ToString("yyyy-MM-dd")" />
+            <button type="submit" class="btn btn-sm btn-coffee px-3" style="min-height: 34px;">Xem báo cáo</button>
+        </form>
+    </div>
+</div>
+
+<!-- Tóm tắt KPI Kỳ Báo cáo -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Doanh thu thực thu</div>
+            <div class="fs-4 fw-bold text-coffee mt-1">@FormatHelper.Vnd(s.TotalRevenue)</div>
+            <small class="text-success">@s.CompletedPaidOrders đơn Hoàn thành &amp; Đã thu</small>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Tổng đơn phát sinh</div>
+            <div class="fs-4 fw-bold mt-1">@s.TotalOrders đơn</div>
+            <small class="text-muted">Tỷ lệ hoàn tất: @(s.TotalOrders > 0 ? Math.Round(s.CompletedPaidOrders * 100.0 / s.TotalOrders, 1) : 0)%</small>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Giá trị đơn trung bình (AOV)</div>
+            <div class="fs-4 fw-bold text-accent mt-1">
+                @FormatHelper.Vnd(s.CompletedPaidOrders > 0 ? s.TotalRevenue / s.CompletedPaidOrders : 0m)
+            </div>
+            <small class="text-muted">Trung bình / đơn hoàn thành</small>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card h-100">
+            <div class="small text-muted fw-semibold text-uppercase">Cảnh báo tồn kho</div>
+            <div class="fs-4 fw-bold @(s.LowStockIngredients.Count > 0 ? "text-danger" : "text-success") mt-1">
+                @s.LowStockIngredients.Count nguyên liệu
+            </div>
+            <small class="text-muted">Chạm ngưỡng tối thiểu hiện tại</small>
+        </div>
+    </div>
+</div>
+
+<!-- Biểu đồ Doanh thu & Số đơn -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-graph-up text-coffee me-2"></i>Biểu đồ Biến động Doanh thu &amp; Lượng đơn theo ngày</h6>
+    </div>
+    <div class="card-body">
+        <div style="position: relative; height: 290px;">
+            <canvas id="reportRevenueChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Sản phẩm Bán chạy & Bán chậm -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-fire text-danger me-2"></i>Top Sản phẩm Bán chạy nhất</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">#</th>
+                            <th>Sản phẩm</th>
+                            <th class="text-center">SL bán</th>
+                            <th class="text-end pe-3">Doanh thu dòng</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (s.TopProducts.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">Chưa có dữ liệu bán hàng trong kỳ.</td></tr>
+                        }
+                        else
+                        {
+                            int rank = 1;
+                            @foreach (var p in s.TopProducts)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-bold text-coffee">@rank</td>
+                                    <td class="fw-semibold">@p.ProductName</td>
+                                    <td class="text-center"><span class="badge bg-coffee">@p.QuantitySold</span></td>
+                                    <td class="text-end pe-3 fw-bold">@FormatHelper.Vnd(p.Revenue)</td>
+                                </tr>
+                                rank++;
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-hourglass-bottom text-secondary me-2"></i>Sản phẩm Bán chậm trong kỳ</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Sản phẩm</th>
+                            <th class="text-center">SL bán</th>
+                            <th class="text-end pe-3">Doanh thu dòng</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in s.SlowProducts)
+                        {
+                            <tr>
+                                <td class="ps-3">@p.ProductName</td>
+                                <td class="text-center"><span class="badge bg-light text-dark border">@p.QuantitySold</span></td>
+                                <td class="text-end pe-3 text-muted">@FormatHelper.Vnd(p.Revenue)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hiệu suất Nhân viên & Top Khách hàng -->
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-person-workspace text-coffee me-2"></i>Hiệu suất Nhân viên Xử lý Đơn</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Nhân viên</th>
+                            <th class="text-center">Đơn hoàn tất</th>
+                            <th class="text-end pe-3">Doanh thu phụ trách</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (s.StaffPerformance.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-4">Chưa có đơn hoàn tất gắn nhân viên trong kỳ.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var st in s.StaffPerformance)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-semibold">@st.StaffName</td>
+                                    <td class="text-center">@st.HandledCount đơn</td>
+                                    <td class="text-end pe-3 fw-bold text-coffee">@FormatHelper.Vnd(st.Revenue)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-gem text-warning me-2"></i>Top Khách hàng Chi tiêu Cao nhất</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Khách hàng</th>
+                            <th class="text-center">Số đơn</th>
+                            <th class="text-end pe-3">Tổng chi tiêu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (s.TopCustomers.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-4">Chưa có dữ liệu khách thành viên trong kỳ.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var cus in s.TopCustomers)
+                            {
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-semibold">@cus.CustomerName</div>
+                                        <small class="text-muted">@cus.Email</small>
+                                    </td>
+                                    <td class="text-center">@cus.OrderCount</td>
+                                    <td class="text-end pe-3 fw-bold text-coffee">@FormatHelper.Vnd(cus.TotalSpent)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tổng hợp Nhập - Xuất - Tồn Nguyên liệu trong kỳ -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-boxes text-coffee me-2"></i>Bảng Tổng hợp Nhập – Xuất – Tiêu hao Nguyên liệu trong kỳ</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Mã NL</th>
+                    <th>Tên nguyên liệu</th>
+                    <th class="text-end text-success">+ Nhập kho</th>
+                    <th class="text-end text-primary">- Pha chế (Sale)</th>
+                    <th class="text-end text-danger">- Xuất / Hao hụt</th>
+                    <th class="text-end">&plusmn; Kiểm kê</th>
+                    <th class="text-end pe-3">Tồn hiện tại</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.StockMovements)
+                {
+                    <tr>
+                        <td class="ps-3"><code>@m.Code</code></td>
+                        <td class="fw-semibold">@m.Name</td>
+                        <td class="text-end text-success">+@m.ImportedQty.ToString("0.##") @m.Unit</td>
+                        <td class="text-end text-primary">-@m.SaleConsumedQty.ToString("0.##") @m.Unit</td>
+                        <td class="text-end text-danger">-@m.ExportAndWastageQty.ToString("0.##") @m.Unit</td>
+                        <td class="text-end">@(m.AdjustDeltaQty >= 0 ? "+" : "")@m.AdjustDeltaQty.ToString("0.##") @m.Unit</td>
+                        <td class="text-end pe-3 fw-bold @(m.IsLowStock ? "text-danger" : "text-dark")">
+                            @m.CurrentStock.ToString("0.##") @m.Unit
+                            @if (m.IsLowStock)
+                            {
+                                <span class="badge bg-danger ms-1">Thấp</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            if (typeof Chart === 'undefined') return;
+            const ctx = document.getElementById('reportRevenueChart');
+            if (!ctx) return;
+
+            const labels = @Html.Raw(revLabelsJson);
+            const revenues = @Html.Raw(revValuesJson);
+            const orders = @Html.Raw(revOrdersJson);
+            const fmt = new Intl.NumberFormat('vi-VN');
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu (₫)',
+                            data: revenues,
+                            backgroundColor: 'rgba(111, 78, 55, 0.78)',
+                            borderRadius: 5,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'line',
+                            label: 'Số đơn hoàn thành',
+                            data: orders,
+                            borderColor: '#C8782A',
+                            backgroundColor: '#C8782A',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { callback: v => fmt.format(v) + ' ₫' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+}

@@ -1,0 +1,78 @@
+@model LoginViewModel
+@inject IWebHostEnvironment HostEnv
+@{
+    ViewData["Title"] = "Đăng nhập";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
+                <div class="text-center mb-4">
+                    <span class="rounded-4 bg-coffee text-white d-inline-flex align-items-center justify-content-center mb-2" style="width: 52px; height: 52px;">
+                        <i class="bi bi-cup-hot-fill fs-3"></i>
+                    </span>
+                    <h1 class="h4 fw-bold font-display mb-1">Đăng nhập Đạt Mộc Coffee</h1>
+                    <p class="text-muted small mb-0">Đặt món nhanh, theo dõi đơn &amp; chọn bàn không gian 3D</p>
+                </div>
+
+                <form method="post" action="/login">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ReturnUrl" />
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger small py-2"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label fw-semibold small">Địa chỉ Email</label>
+                        <input asp-for="Email" class="form-control form-control-lg fs-6" placeholder="email@coffee.local" autocomplete="username" />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <label asp-for="Password" class="form-label fw-semibold small">Mật khẩu</label>
+                            <a href="/forgot-password" class="small text-coffee text-decoration-none">Quên mật khẩu?</a>
+                        </div>
+                        <input asp-for="Password" class="form-control form-control-lg fs-6" placeholder="••••••••" autocomplete="current-password" />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label small">Duy trì đăng nhập trên thiết bị này</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-coffee w-100 mb-3">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Đăng nhập
+                    </button>
+
+                    <div class="text-center small text-muted">
+                        Chưa có tài khoản khách hàng?
+                        <a href="/register" class="fw-semibold text-coffee text-decoration-none">Đăng ký ngay</a>
+                    </div>
+                </form>
+
+                @if (HostEnv.IsDevelopment())
+                {
+                    <hr class="my-4" />
+                    <div class="bg-cream rounded-3 p-3">
+                        <div class="small fw-bold text-coffee mb-2"><i class="bi bi-lightning-charge-fill"></i> Điền nhanh tài khoản Test (Development):</div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="fillDemo('admin@coffee.local','Admin@123')">Admin</button>
+                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="fillDemo('staff@coffee.local','Staff@123')">Staff (Đủ quyền ◐)</button>
+                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="fillDemo('staff2@coffee.local','Staff@123')">Staff 2 (Cơ bản)</button>
+                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="fillDemo('customer@coffee.local','Customer@123')">Customer</button>
+                        </div>
+                    </div>
+                    <script>
+                        function fillDemo(email, pwd) {
+                            document.getElementById('Email').value = email;
+                            document.getElementById('Password').value = pwd;
+                        }
+                    </script>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+

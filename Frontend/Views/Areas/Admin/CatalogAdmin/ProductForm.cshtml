@@ -1,0 +1,550 @@
+@using System.Text.Json
+@using CoffeeShop.Areas.Admin.Models
+@model ProductFormViewModel
+@{
+    var isEdit = Model.Id > 0;
+    ViewData["Title"] = isEdit ? $"Chỉnh sửa: {Model.Name}" : "Thêm Sản phẩm & Công thức mới";
+
+    var ingredientsJson = JsonSerializer.Serialize(Model.AllIngredients.Select(i => new
+    {
+        id = i.Id,
+        code = i.Code,
+        name = i.Name,
+        unit = i.Unit
+    }));
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-coffee">
+            <i class="bi @(isEdit ? "bi-pencil-square" : "bi-plus-circle-fill") me-2"></i>@ViewData["Title"]
+        </h4>
+        <div class="text-muted small">Thiết lập thông tin món, tùy chọn đường/đá, mô phỏng màu chất lỏng 3D Three.js và công thức trừ kho tự động.</div>
+    </div>
+    <a href="/admin/products" class="btn btn-outline-secondary bg-white">
+        <i class="bi bi-arrow-left me-1"></i>Quay lại Danh sách
+    </a>
+</div>
+
+<form method="post" action="/admin/products/save" enctype="multipart/form-data" id="productMasterForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="ExistingImageUrl" />
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+    <!-- Bootstrap Tabs -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom pt-3 pb-0">
+            <ul class="nav nav-tabs card-header-tabs fw-semibold" id="productTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active text-coffee" id="tab-info-btn" data-bs-toggle="tab" data-bs-target="#tab-info-pane" type="button" role="tab">
+                        <i class="bi bi-cup-hot-fill me-1"></i>1. Thông tin, Tùy chọn &amp; Màu 3D
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-coffee" id="tab-recipe-btn" data-bs-toggle="tab" data-bs-target="#tab-recipe-pane" type="button" role="tab">
+                        <i class="bi bi-boxes me-1"></i>2. Công thức Định lượng Nguyên liệu (Recipe)
+                        <span class="badge rounded-pill bg-coffee ms-1" id="recipeCountBadge">@Model.Recipes.Count</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card-body p-4">
+            <div class="tab-content" id="productTabsContent">
+
+                <!-- TAB 1: THÔNG TIN & TÙY CHỌN & MÀU 3D -->
+                <div class="tab-pane fade show active" id="tab-info-pane" role="tabpanel">
+                    <div class="row g-4">
+                        <!-- Cột trái: Thông tin chính & Sizes & Toppings -->
+                        <div class="col-12 col-xl-7">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-7">
+                                    <label asp-for="Name" class="form-label fw-semibold">Tên sản phẩm <span class="text-danger">*</span></label>
+                                    <input asp-for="Name" class="form-control" placeholder="VD: Bạc Xỉu Đạt Mộc" />
+                                    <span asp-validation-for="Name" class="text-danger small"></span>
+                                </div>
+
+                                <div class="col-12 col-md-5">
+                                    <label asp-for="CategoryId" class="form-label fw-semibold">Danh mục <span class="text-danger">*</span></label>
+                                    <select asp-for="CategoryId" class="form-select" id="categorySelect">
+                                        <option value="0">-- Chọn danh mục --</option>
+                                        @foreach (var cat in Model.Categories)
+                                        {
+                                            <option value="@cat.Id" data-slug="@cat.Slug">@cat.Name</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                                </div>
+
+                                <div class="col-12 col-md-5">
+                                    <label asp-for="BasePrice" class="form-label fw-semibold">Giá cơ bản (₫) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input asp-for="BasePrice" type="number" min="1000" step="1000" class="form-control fw-bold" id="basePriceInput" />
+                                        <span class="input-group-text">₫</span>
+                                    </div>
+                                    <span asp-validation-for="BasePrice" class="text-danger small"></span>
+                                </div>
+
+                                <div class="col-12 col-md-7">
+                                    <label class="form-label fw-semibold">Ảnh đại diện món <small class="text-muted fw-normal">(JPG, PNG, WEBP &le; 2MB)</small></label>
+                                    <input asp-for="ImageFile" type="file" class="form-control" id="productImageInput" accept=".jpg,.jpeg,.png,.webp" />
+                                    <span asp-validation-for="ImageFile" class="text-danger small"></span>
+                                </div>
+
+                                <div class="col-12">
+                                    <label asp-for="Description" class="form-label fw-semibold">Mô tả hương vị</label>
+                                    <textarea asp-for="Description" rows="3" class="form-control" placeholder="Mô tả hương vị hạt rang mộc, hậu vị ngọt dịu..."></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Các tùy chọn cho phép & trạng thái -->
+                            <div class="p-3 rounded-3 bg-light border mt-4">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-sliders2 text-coffee me-2"></i>Cấu hình Tùy chọn &amp; Hiển thị</h6>
+                                <div class="row g-3">
+                                    <div class="col-6 col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input asp-for="AllowTemperature" class="form-check-input" role="switch" />
+                                            <label asp-for="AllowTemperature" class="form-check-label">Chọn Nóng / Lạnh</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input asp-for="AllowSugar" class="form-check-input" role="switch" />
+                                            <label asp-for="AllowSugar" class="form-check-label">Chọn Mức đường</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input asp-for="AllowIce" class="form-check-input" role="switch" />
+                                            <label asp-for="AllowIce" class="form-check-label">Chọn Mức đá</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input asp-for="IsFeatured" class="form-check-input" role="switch" />
+                                            <label asp-for="IsFeatured" class="form-check-label fw-semibold text-warning-emphasis">Món Nổi bật</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-8">
+                                        <div class="form-check form-switch">
+                                            <input asp-for="IsAvailable" class="form-check-input" role="switch" />
+                                            <label asp-for="IsAvailable" class="form-check-label fw-semibold text-success">Đang kinh doanh (tắt để báo Tạm hết)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bảng Size S / M / L động -->
+                            <div class="mt-4">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <h6 class="fw-bold mb-0"><i class="bi bi-aspect-ratio text-coffee me-2"></i>Biến thể Kích cỡ (Sizes)</h6>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPresetSml">
+                                            <i class="bi bi-magic me-1"></i>Tạo nhanh S / M / L
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-coffee" id="btnAddSizeRow" style="min-height: 34px;">
+                                            <i class="bi bi-plus-lg me-1"></i>Thêm Size
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive border rounded-3">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 30%;">Tên Size (S, M, L...)</th>
+                                                <th style="width: 40%;">Giá theo Size (₫)</th>
+                                                <th style="width: 20%;">Thứ tự</th>
+                                                <th class="text-end" style="width: 10%;">Xóa</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="sizesTableBody">
+                                            @for (int i = 0; i < Model.Sizes.Count; i++)
+                                            {
+                                                <tr class="size-row">
+                                                    <td>
+                                                        <input type="text" name="Sizes[@i].SizeName" value="@Model.Sizes[i].SizeName" class="form-control form-control-sm fw-bold" placeholder="S / M / L" />
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="Sizes[@i].Price" value="@Model.Sizes[i].Price.ToString("0")" class="form-control form-control-sm" min="1000" step="1000" />
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="Sizes[@i].DisplayOrder" value="@Model.Sizes[i].DisplayOrder" class="form-control form-control-sm" min="1" />
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-sm btn-link text-danger btn-remove-size" aria-label="Xóa size">
+                                                            <i class="bi bi-x-circle-fill"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="form-text">Nếu để trống bảng Size, hệ thống dùng Giá cơ bản mặc định cho món (phù hợp với Bánh ngọt).</div>
+                            </div>
+
+                            <!-- Topping cho phép -->
+                            <div class="mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold mb-0"><i class="bi bi-plus-circle-dotted text-coffee me-2"></i>Topping được phép chọn kèm</h6>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="btnToggleAllToppings">Chọn / Bỏ chọn tất cả</button>
+                                </div>
+                                <div class="row g-2 p-3 border rounded-3 bg-white">
+                                    @if (Model.AllToppings.Count == 0)
+                                    {
+                                        <div class="col-12 text-muted small">Chưa có topping nào. <a href="/admin/toppings">Thêm topping tại đây</a>.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var top in Model.AllToppings)
+                                        {
+                                            var isChecked = Model.SelectedToppingIds.Contains(top.Id);
+                                            <div class="col-12 col-sm-6">
+                                                <label class="d-flex align-items-center justify-content-between border rounded-2 px-3 py-2 w-100" style="cursor:pointer;">
+                                                    <span class="d-flex align-items-center gap-2">
+                                                        <input type="checkbox" class="form-check-input mt-0 topping-chk" name="SelectedToppingIds" value="@top.Id" checked="@isChecked" />
+                                                        <span class="@(!top.IsActive ? "text-muted text-decoration-line-through" : "fw-medium")">@top.Name</span>
+                                                    </span>
+                                                    <span class="small text-coffee fw-semibold">+@FormatHelper.Vnd(top.Price)</span>
+                                                </label>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cột phải: Xem trước Ảnh + Mô hình 3D Three.js Drink Preview -->
+                        <div class="col-12 col-xl-5">
+                            <div class="card border shadow-xs mb-3">
+                                <div class="card-header bg-cream py-2 d-flex justify-content-between align-items-center">
+                                    <strong class="small text-coffee"><i class="bi bi-box me-1"></i>Mô phỏng Màu chất lỏng 3D (Three.js)</strong>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-dark py-0 px-2 active" id="btnPreviewCold">Ly Lạnh</button>
+                                        <button type="button" class="btn btn-outline-dark py-0 px-2" id="btnPreviewHot">Cốc Nóng</button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center gap-3 mb-3">
+                                        <input asp-for="LiquidColorHex" type="color" class="form-control form-control-color border-2" id="liquidColorPicker" style="width: 56px; height: 44px;" />
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small fw-semibold mb-1">Mã màu Hex hiển thị trong ly 3D</label>
+                                            <input type="text" id="liquidColorText" class="form-control form-control-sm font-monospace" value="@Model.LiquidColorHex" readonly />
+                                        </div>
+                                    </div>
+
+                                    <!-- Swatch gợi ý màu đồ uống F&B -->
+                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                        @{
+                                            var presets = new (string Hex, string Title)[]
+                                            {
+                                                ("#3B2213", "Espresso / Đen đá"),
+                                                ("#6F4E37", "Cà phê Sữa"),
+                                                ("#A47551", "Bạc Xỉu / Latte"),
+                                                ("#5C8A3C", "Matcha Nhật"),
+                                                ("#C86D1F", "Trà Đào Cam Sả"),
+                                                ("#8D2B3A", "Trà Hibiscus Dâu"),
+                                                ("#D9A05B", "Trà Sữa Oolong")
+                                            };
+                                        }
+                                        @foreach (var sw in presets)
+                                        {
+                                            <button type="button" class="btn btn-sm border rounded-pill d-inline-flex align-items-center gap-1 color-preset-btn"
+                                                    data-hex="@sw.Hex" title="@sw.Title">
+                                                <span class="rounded-circle d-inline-block" style="width: 14px; height: 14px; background-color: @sw.Hex;"></span>
+                                                <small>@sw.Title</small>
+                                            </button>
+                                        }
+                                    </div>
+
+                                    <div id="adminDrink3DStage" class="three-drink-stage" style="height: 290px;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Xem trước Ảnh 2D -->
+                            <div class="card border shadow-xs">
+                                <div class="card-header bg-light py-2">
+                                    <strong class="small"><i class="bi bi-image me-1"></i>Xem trước Ảnh đại diện 2D</strong>
+                                </div>
+                                <div class="card-body text-center">
+                                    <img id="productImgPreview" src="@Model.ExistingImageUrl" alt="Preview"
+                                         class="rounded-3 border bg-cream" style="max-width: 100%; height: 200px; object-fit: cover;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: CÔNG THỨC ĐỊNH LƯỢNG NGUYÊN LIỆU (RECIPE) -->
+                <div class="tab-pane fade" id="tab-recipe-pane" role="tabpanel">
+                    <div class="alert alert-info d-flex align-items-start gap-2">
+                        <i class="bi bi-info-circle-fill fs-5"></i>
+                        <div class="small">
+                            <strong>Cơ chế trừ kho tự động theo Công thức (Recipe):</strong> Khi đơn hàng chuyển sang trạng thái
+                            <span class="badge bg-primary">Đang pha chế</span>, hệ thống sẽ tự động đối chiếu các dòng nguyên liệu bên dưới.
+                            Dòng để <strong>"Áp dụng mọi Size"</strong> sẽ trừ cho bất kỳ size nào; dòng chọn riêng <strong>S / M / L</strong> sẽ cộng thêm (hoặc định lượng riêng) khi khách đặt đúng size đó.
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-list-check text-coffee me-2"></i>Bảng Định lượng Nguyên liệu</h6>
+                        <button type="button" class="btn btn-coffee btn-sm" id="btnAddRecipeRow" style="min-height: 38px;">
+                            <i class="bi bi-plus-lg me-1"></i>Thêm dòng nguyên liệu
+                        </button>
+                    </div>
+
+                    <div class="table-responsive border rounded-3">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 45%;">Nguyên liệu trong kho</th>
+                                    <th style="width: 25%;">Áp dụng cho Size</th>
+                                    <th style="width: 22%;">Định lượng tiêu hao</th>
+                                    <th class="text-end" style="width: 8%;">Xóa</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipesTableBody">
+                                @for (int i = 0; i < Model.Recipes.Count; i++)
+                                {
+                                    var r = Model.Recipes[i];
+                                    var matchedIng = Model.AllIngredients.FirstOrDefault(x => x.Id == r.IngredientId);
+                                    <tr class="recipe-row">
+                                        <td>
+                                            <select name="Recipes[@i].IngredientId" class="form-select recipe-ing-select">
+                                                <option value="0">-- Chọn nguyên liệu --</option>
+                                                @foreach (var ing in Model.AllIngredients)
+                                                {
+                                                    <option value="@ing.Id" data-unit="@ing.Unit" selected="@(ing.Id == r.IngredientId)">
+                                                        [@ing.Code] @ing.Name (Tồn: @ing.StockQty.ToString("0.##") @ing.Unit)
+                                                    </option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="Recipes[@i].SizeName" class="form-select">
+                                                <option value="" selected="@(string.IsNullOrWhiteSpace(r.SizeName))">Áp dụng mọi Size</option>
+                                                <option value="S" selected="@(r.SizeName == "S")">Chỉ Size S</option>
+                                                <option value="M" selected="@(r.SizeName == "M")">Chỉ Size M</option>
+                                                <option value="L" selected="@(r.SizeName == "L")">Chỉ Size L</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <div class="input-group">
+                                                <input type="number" step="0.01" min="0.01" name="Recipes[@i].Quantity" value="@r.Quantity.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+                                                <span class="input-group-text recipe-unit-label">@(matchedIng?.Unit ?? "đv")</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-recipe">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card-footer bg-light border-top py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <a href="/admin/products" class="btn btn-light border">Hủy bỏ</a>
+            <button type="submit" class="btn btn-coffee px-4">
+                <i class="bi bi-floppy-fill me-2"></i>@(isEdit ? "Lưu cập nhật Sản phẩm & Công thức" : "Tạo Sản phẩm mới")
+            </button>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script type="module">
+        import { initDrinkCustomizer3D } from '/js/three-drink-customizer.js';
+
+        const ingredientsList = @Html.Raw(ingredientsJson);
+
+        // 1. Khởi tạo mô phỏng ly 3D Three.js trực tiếp trong trang Admin
+        const picker = document.getElementById('liquidColorPicker');
+        const hexText = document.getElementById('liquidColorText');
+        const btnCold = document.getElementById('btnPreviewCold');
+        const btnHot = document.getElementById('btnPreviewHot');
+
+        const drink3d = initDrinkCustomizer3D('adminDrink3DStage', {
+            isBakery: false,
+            liquidColor: picker?.value || '#4A2C18',
+            sizeName: 'M',
+            temperature: 'Lạnh',
+            iceLevel: '70',
+            toppings: []
+        });
+
+        function applyColor(hex) {
+            if (picker) picker.value = hex;
+            if (hexText) hexText.value = hex.toUpperCase();
+            drink3d?.updateCustomization({ liquidColor: hex });
+        }
+
+        picker?.addEventListener('input', () => applyColor(picker.value));
+
+        document.querySelectorAll('.color-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => applyColor(btn.dataset.hex));
+        });
+
+        btnCold?.addEventListener('click', () => {
+            btnCold.classList.add('active');
+            btnHot?.classList.remove('active');
+            drink3d?.updateCustomization({ temperature: 'Lạnh' });
+        });
+
+        btnHot?.addEventListener('click', () => {
+            btnHot.classList.add('active');
+            btnCold?.classList.remove('active');
+            drink3d?.updateCustomization({ temperature: 'Nóng' });
+        });
+
+        // 2. Preview ảnh 2D ngay khi chọn file
+        document.getElementById('productImageInput')?.addEventListener('change', function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.getElementById('productImgPreview');
+                if (img && e.target?.result) img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 3. Quản lý các dòng Size S / M / L động + Re-index trước khi submit
+        const sizesBody = document.getElementById('sizesTableBody');
+
+        function reindexSizes() {
+            sizesBody.querySelectorAll('tr.size-row').forEach((tr, idx) => {
+                const inputs = tr.querySelectorAll('input');
+                if (inputs[0]) inputs[0].name = `Sizes[${idx}].SizeName`;
+                if (inputs[1]) inputs[1].name = `Sizes[${idx}].Price`;
+                if (inputs[2]) inputs[2].name = `Sizes[${idx}].DisplayOrder`;
+            });
+        }
+
+        function addSizeRow(name = '', price = 35000, order = 1) {
+            const tr = document.createElement('tr');
+            tr.className = 'size-row';
+            tr.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm fw-bold" value="${name}" placeholder="S / M / L" /></td>
+                <td><input type="number" class="form-control form-control-sm" value="${price}" min="1000" step="1000" /></td>
+                <td><input type="number" class="form-control form-control-sm" value="${order}" min="1" /></td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-link text-danger btn-remove-size"><i class="bi bi-x-circle-fill"></i></button>
+                </td>`;
+            sizesBody.appendChild(tr);
+            reindexSizes();
+        }
+
+        document.getElementById('btnAddSizeRow')?.addEventListener('click', () => {
+            const base = parseInt(document.getElementById('basePriceInput')?.value || '35000', 10) || 35000;
+            const count = sizesBody.querySelectorAll('tr.size-row').length;
+            addSizeRow('', base, count + 1);
+        });
+
+        document.getElementById('btnPresetSml')?.addEventListener('click', () => {
+            const base = parseInt(document.getElementById('basePriceInput')?.value || '35000', 10) || 35000;
+            sizesBody.innerHTML = '';
+            addSizeRow('S', base, 1);
+            addSizeRow('M', base + 6000, 2);
+            addSizeRow('L', base + 12000, 3);
+        });
+
+        sizesBody?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-remove-size');
+            if (btn) {
+                btn.closest('tr')?.remove();
+                reindexSizes();
+            }
+        });
+
+        // 4. Chọn nhanh tất cả Topping
+        document.getElementById('btnToggleAllToppings')?.addEventListener('click', () => {
+            const chks = Array.from(document.querySelectorAll('.topping-chk'));
+            const allChecked = chks.every(c => c.checked);
+            chks.forEach(c => c.checked = !allChecked);
+        });
+
+        // 5. Quản lý các dòng Công thức (Recipe) động + tự hiển thị Đơn vị tính
+        const recipesBody = document.getElementById('recipesTableBody');
+        const recipeBadge = document.getElementById('recipeCountBadge');
+
+        function reindexRecipes() {
+            const rows = recipesBody.querySelectorAll('tr.recipe-row');
+            rows.forEach((tr, idx) => {
+                const selects = tr.querySelectorAll('select');
+                const qtyInput = tr.querySelector('input[type="number"]');
+                if (selects[0]) selects[0].name = `Recipes[${idx}].IngredientId`;
+                if (selects[1]) selects[1].name = `Recipes[${idx}].SizeName`;
+                if (qtyInput) qtyInput.name = `Recipes[${idx}].Quantity`;
+            });
+            if (recipeBadge) recipeBadge.textContent = rows.length;
+        }
+
+        function buildIngredientOptionsHtml() {
+            let html = '<option value="0">-- Chọn nguyên liệu --</option>';
+            ingredientsList.forEach(ing => {
+                html += `<option value="${ing.id}" data-unit="${ing.unit}">[${ing.code}] ${ing.name} (${ing.unit})</option>`;
+            });
+            return html;
+        }
+
+        document.getElementById('btnAddRecipeRow')?.addEventListener('click', () => {
+            const tr = document.createElement('tr');
+            tr.className = 'recipe-row';
+            tr.innerHTML = `
+                <td>
+                    <select class="form-select recipe-ing-select">${buildIngredientOptionsHtml()}</select>
+                </td>
+                <td>
+                    <select class="form-select">
+                        <option value="">Áp dụng mọi Size</option>
+                        <option value="S">Chỉ Size S</option>
+                        <option value="M">Chỉ Size M</option>
+                        <option value="L">Chỉ Size L</option>
+                    </select>
+                </td>
+                <td>
+                    <div class="input-group">
+                        <input type="number" step="0.01" min="0.01" value="15" class="form-control" required />
+                        <span class="input-group-text recipe-unit-label">đv</span>
+                    </div>
+                </td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-remove-recipe"><i class="bi bi-trash"></i></button>
+                </td>`;
+            recipesBody.appendChild(tr);
+            reindexRecipes();
+        });
+
+        recipesBody?.addEventListener('change', (e) => {
+            if (e.target.classList.contains('recipe-ing-select')) {
+                const opt = e.target.options[e.target.selectedIndex];
+                const unit = opt?.dataset?.unit || 'đv';
+                const lbl = e.target.closest('tr')?.querySelector('.recipe-unit-label');
+                if (lbl) lbl.textContent = unit;
+            }
+        });
+
+        recipesBody?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-remove-recipe');
+            if (btn) {
+                btn.closest('tr')?.remove();
+                reindexRecipes();
+            }
+        });
+
+        document.getElementById('productMasterForm')?.addEventListener('submit', () => {
+            reindexSizes();
+            reindexRecipes();
+        });
+    </script>
+}

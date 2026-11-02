@@ -1,0 +1,221 @@
+@model HomeIndexVm
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Trang chủ Không gian 3D";
+    var tablesJson = JsonSerializer.Serialize(Model.Tables3D, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<!-- HERO 3D INTERACTIVE SHOWCASE (Three.js WebGL) -->
+<section class="py-4 py-lg-5" style="background: linear-gradient(135deg, #241710 0%, #3E271B 100%); color: #FFFDF9;">
+    <div class="container">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-5">
+                <span class="badge rounded-pill px-3 py-2 mb-3" style="background: rgba(200, 120, 42, 0.25); color: #FFD29D; border: 1px solid rgba(200, 120, 42, 0.5);">
+                    <i class="bi bi-badge-3d-fill me-1"></i> Trải nghiệm quán Cà phê 3D thời gian thực
+                </span>
+                <h1 class="display-5 fw-bold font-display mb-3">@Model.Store.ShopName</h1>
+                <p class="lead text-white-50 mb-4">@Model.Store.Slogan</p>
+
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                    <a href="/menu" class="btn btn-accent btn-lg px-4">
+                        <i class="bi bi-cup-hot-fill me-2"></i> Khám phá menu
+                    </a>
+                    <a href="/reservation" class="btn btn-outline-light btn-lg px-4" style="min-height: 44px; display: inline-flex; align-items: center;">
+                        <i class="bi bi-box me-2"></i> Chọn bàn 3D (@Model.AvailableTableCount bàn trống)
+                    </a>
+                </div>
+
+                <div class="row g-2 text-white-50 small">
+                    <div class="col-6">
+                        <div class="p-2 rounded-3" style="background: rgba(255,255,255,0.06);">
+                            <i class="bi bi-clock text-warning me-1"></i> @Model.Store.OpeningHours
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded-3" style="background: rgba(255,255,255,0.06);">
+                            <i class="bi bi-check2-circle text-success me-1"></i> Tùy chỉnh ly 3D trực quan
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="three-hero-stage" id="heroCafe3DStage">
+                    <!-- Điều khiển góc quay Camera 3D & Ánh sáng Ngày/Đêm -->
+                    <div class="three-canvas-overlay top-0 start-0 end-0 p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-dark bg-opacity-75 border-secondary interactive-pill" data-zone-cam="overview">Toàn cảnh</button>
+                            <button type="button" class="btn btn-sm btn-dark bg-opacity-75 border-secondary interactive-pill" data-zone-cam="bar">Quầy Bar</button>
+                            <button type="button" class="btn btn-sm btn-dark bg-opacity-75 border-secondary interactive-pill" data-zone-cam="floor1">Tầng 1</button>
+                            <button type="button" class="btn btn-sm btn-dark bg-opacity-75 border-secondary interactive-pill" data-zone-cam="floor2">Tầng 2</button>
+                            <button type="button" class="btn btn-sm btn-dark bg-opacity-75 border-secondary interactive-pill" data-zone-cam="garden">Sân vườn</button>
+                        </div>
+                        <button type="button" id="btnToggle3DMood" class="btn btn-sm btn-warning text-dark fw-semibold interactive-pill">
+                            <i class="bi bi-moon-stars-fill me-1"></i> Chế độ Đêm
+                        </button>
+                    </div>
+
+                    <div class="three-canvas-overlay bottom-0 start-0 end-0 p-2 px-3 d-flex justify-content-between align-items-center small text-white-50" style="background: linear-gradient(transparent, rgba(0,0,0,0.65));">
+                        <span><i class="bi bi-mouse2 me-1"></i> Kéo chuột / chạm để xoay 360° • Cuộn để thu phóng</span>
+                        <span class="d-none d-sm-inline">
+                            <span class="badge rounded-pill" style="background:#10B981;">Trống</span>
+                            <span class="badge rounded-pill" style="background:#F59E0B;">Có khách</span>
+                            <span class="badge rounded-pill" style="background:#3B82F6;">Đặt trước</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- DANH MỤC SẢN PHẨM -->
+<section class="container py-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4">
+        <div>
+            <span class="text-accent fw-bold small text-uppercase">Thực đơn đa dạng</span>
+            <h2 class="h3 fw-bold font-display mb-0">Khám phá theo Danh mục</h2>
+        </div>
+        <a href="/menu" class="btn btn-outline-coffee btn-sm px-3">Xem toàn bộ thực đơn <i class="bi bi-arrow-right ms-1"></i></a>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var cat in Model.Categories)
+        {
+            <div class="col-6 col-md-4 col-lg">
+                <a href="/menu?categoryId=@cat.Id" class="card border-0 shadow-sm rounded-4 p-3 text-center text-decoration-none h-100 bg-white">
+                    <div class="mx-auto mb-2 rounded-circle bg-cream text-coffee d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
+                        <i class="bi @cat.IconClass fs-4"></i>
+                    </div>
+                    <strong class="text-dark d-block">@cat.Name</strong>
+                    <small class="text-muted">Khám phá ngay</small>
+                </a>
+            </div>
+        }
+    </div>
+</section>
+
+<!-- MÓN NỔI BẬT & BÁN CHẠY THẬT TỪ DATABASE -->
+<section class="container pb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4">
+        <div>
+            <span class="text-accent fw-bold small text-uppercase">Được yêu thích nhất</span>
+            <h2 class="h3 fw-bold font-display mb-0">Món nổi bật &amp; Bán chạy</h2>
+        </div>
+        <span class="text-muted small"><i class="bi bi-badge-3d me-1"></i>Bấm nút <strong>3D</strong> trên thẻ món để pha thử ly 3D theo ý thích</span>
+    </div>
+
+    @if (Model.FeaturedProducts.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
+            <p class="text-muted mb-0">Thực đơn đang được cập nhật.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var item in Model.FeaturedProducts)
+            {
+                <div class="col-sm-6 col-lg-3">
+                    <partial name="_ProductCardPartial" model="item" />
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<!-- ƯU ĐÃI ĐANG HOẠT ĐỘNG (LẤY TỪ PROMOTION DATABASE) -->
+@if (Model.ActivePromotions.Count > 0)
+{
+    <section class="py-5 bg-cream">
+        <div class="container">
+            <div class="mb-4">
+                <span class="text-accent fw-bold small text-uppercase">Quà tặng hôm nay</span>
+                <h2 class="h3 fw-bold font-display mb-0">Mã Ưu đãi đang áp dụng</h2>
+            </div>
+            <div class="row g-3">
+                @foreach (var promo in Model.ActivePromotions)
+                {
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div>
+                                    <span class="badge bg-coffee px-3 py-2 fs-6 mb-2">@promo.Code</span>
+                                    <h3 class="h5 fw-bold mb-1">@promo.Name</h3>
+                                    <p class="text-muted small mb-2">
+                                        Đơn tối thiểu: <strong>@FormatHelper.Vnd(promo.MinOrderValue)</strong>
+                                        @if (promo.MaxDiscount.HasValue)
+                                        {
+                                            <span> • Giảm tối đa: <strong>@FormatHelper.Vnd(promo.MaxDiscount.Value)</strong></span>
+                                        }
+                                    </p>
+                                    <small class="text-secondary"><i class="bi bi-calendar-event me-1"></i>HSD: @FormatHelper.DateTimeVn(promo.EndAt, "dd/MM/yyyy")</small>
+                                </div>
+                                <button type="button" class="btn btn-outline-coffee btn-sm" onclick="navigator.clipboard?.writeText('@promo.Code'); window.DatMocRealtime?.showToast('Đã sao chép mã', 'Mã @promo.Code đã lưu vào bộ nhớ tạm!', 'success');">
+                                    <i class="bi bi-clipboard-check me-1"></i> Sao chép
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<!-- CÂU CHUYỆN THƯƠNG HIỆU & KHÔNG GIAN -->
+<section class="container py-5">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-6">
+            <span class="text-accent fw-bold small text-uppercase">Câu chuyện Đạt Mộc</span>
+            <h2 class="h3 fw-bold font-display mb-3">Từ hạt cà phê rang mộc đến không gian kết nối hiện đại</h2>
+            <p class="text-secondary">
+                Tại <strong>@Model.Store.ShopName</strong>, mỗi tách cà phê được chiết xuất từ nguồn hạt Robusta Đắk Lắk và Arabica Cầu Đất tuyển chọn, rang mộc hoàn toàn để giữ trọn hương thơm nguyên bản.
+            </p>
+            <p class="text-secondary mb-4">
+                Với 3 phân khu không gian đặc trưng — <strong>Tầng 1</strong> năng động gần quầy Bar Espresso, <strong>Tầng 2</strong> yên tĩnh cho học tập &amp; làm việc, và <strong>Sân vườn</strong> ngập tràn cây xanh — bạn có thể xem trước bàn trống trên mô hình 3D trực tuyến trước khi ghé quán.
+            </p>
+            <a href="/about" class="btn btn-coffee px-4">Tìm hiểu thêm về chúng tôi</a>
+        </div>
+        <div class="col-lg-6">
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="p-4 rounded-4 bg-white shadow-sm border h-100">
+                        <i class="bi bi-award-fill fs-2 text-coffee d-block mb-2"></i>
+                        <h3 class="h6 fw-bold">100% Hạt Rang Mộc</h3>
+                        <p class="small text-muted mb-0">Không tẩm hương liệu hóa học, kiểm soát định lượng chuẩn xác từng gram.</p>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-4 rounded-4 bg-white shadow-sm border h-100">
+                        <i class="bi bi-badge-3d-fill fs-2 text-accent d-block mb-2"></i>
+                        <h3 class="h6 fw-bold">Đặt Món &amp; Bàn 3D</h3>
+                        <p class="small text-muted mb-0">Trực quan hóa ly nước theo mức đá/topping và theo dõi pha chế thời gian thực.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script type="module">
+        import { initCafeHero3D } from '/js/three-cafe-hero.js';
+
+        const tablesData = @Html.Raw(tablesJson);
+        const hero3D = initCafeHero3D('heroCafe3DStage', tablesData);
+
+        document.querySelectorAll('[data-zone-cam]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                hero3D?.flyToZone(btn.dataset.zoneCam);
+            });
+        });
+
+        document.getElementById('btnToggle3DMood')?.addEventListener('click', (e) => {
+            const isNight = hero3D?.toggleNightMode();
+            e.currentTarget.innerHTML = isNight
+                ? '<i class="bi bi-sun-fill me-1"></i> Chế độ Ngày'
+                : '<i class="bi bi-moon-stars-fill me-1"></i> Chế độ Đêm';
+        });
+    </script>
+}

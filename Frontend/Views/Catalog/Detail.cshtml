@@ -1,0 +1,272 @@
+@model ProductDetailVm
+@{
+    ViewData["Title"] = Model.Name;
+    bool isBakery = !Model.AllowTemperature && !Model.AllowIce;
+    var defaultSize = Model.Sizes.FirstOrDefault().SizeName ?? "";
+    var defaultPrice = Model.Sizes.Count > 0 ? Model.Sizes.First().Price : Model.BasePrice;
+}
+
+<div class="container py-4 py-lg-5">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb small mb-0">
+            <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-coffee">Trang chủ</a></li>
+            <li class="breadcrumb-item"><a href="/menu" class="text-decoration-none text-coffee">Thực đơn</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@Model.Name</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Cột Trái: Mô phỏng 3D Tương Tác Thời Gian Thực (Three.js) + Ảnh gốc -->
+        <div class="col-lg-5">
+            <div class="three-drink-stage shadow-sm mb-3" id="drink3DStage">
+                <div class="three-canvas-overlay top-0 start-0 p-3">
+                    <span class="badge bg-coffee px-3 py-2 shadow-sm">
+                        <i class="bi bi-badge-3d-fill me-1"></i> Mô phỏng 3D theo lựa chọn của bạn
+                    </span>
+                </div>
+                <div class="three-canvas-overlay bottom-0 start-0 end-0 p-2 text-center small text-secondary">
+                    <i class="bi bi-arrows-move me-1"></i> Xoay 360° • Đổi Size, Nóng/Lạnh, Đá &amp; Topping để xem ly 3D biến đổi
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 p-3 rounded-4 bg-white border shadow-sm">
+                <img src="@Model.ImageUrl" alt="@Model.Name" class="rounded-3 object-fit-cover" style="width: 72px; height: 72px;" />
+                <div>
+                    <span class="badge bg-cream text-coffee mb-1">@Model.CategoryName</span>
+                    <div class="fw-bold small">@Model.Name</div>
+                    <small class="text-muted">Hình minh họa thực đơn chuẩn tại quán</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột Phải: Tùy chỉnh món & Thêm vào giỏ -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <h1 class="h3 fw-bold font-display mb-1">@Model.Name</h1>
+                        <p class="text-secondary mb-0">@Model.Description</p>
+                    </div>
+                    @if (!Model.IsAvailable)
+                    {
+                        <span class="badge bg-danger px-3 py-2 fs-6">Tạm hết hàng</span>
+                    }
+                </div>
+
+                <hr class="my-3" />
+
+                <form method="post" action="/cart/add" id="productCustomizeForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId" value="@Model.Id" />
+
+                    <!-- 1. Chọn Size -->
+                    @if (Model.Sizes.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">1. Chọn Kích cỡ (Size) *</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @for (int i = 0; i < Model.Sizes.Count; i++)
+                                {
+                                    var sz = Model.Sizes[i];
+                                    <input type="radio" class="btn-check opt-size" name="sizeName" id="sz_@i"
+                                           value="@sz.SizeName" data-price="@sz.Price" checked="@(i == 0)" required />
+                                    <label class="btn btn-outline-coffee px-3" for="sz_@i">
+                                        <strong>@sz.SizeName</strong> <span class="ms-1">(@FormatHelper.Vnd(sz.Price))</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 2. Chọn Nóng / Lạnh -->
+                    @if (Model.AllowTemperature)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">2. Nhiệt độ thưởng thức *</label>
+                            <div class="d-flex gap-2">
+                                <input type="radio" class="btn-check opt-temp" name="temperature" id="tempCold" value="Lạnh" checked />
+                                <label class="btn btn-outline-coffee px-3" for="tempCold"><i class="bi bi-snow2 me-1"></i> Đá lạnh</label>
+
+                                <input type="radio" class="btn-check opt-temp" name="temperature" id="tempHot" value="Nóng" />
+                                <label class="btn btn-outline-coffee px-3" for="tempHot"><i class="bi bi-fire me-1"></i> Pha nóng</label>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 3. Mức đường -->
+                    @if (Model.AllowSugar)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">3. Mức đường</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var sg in new[] { "100%", "70%", "50%", "30%", "0%" })
+                                {
+                                    <input type="radio" class="btn-check" name="sugarLevel" id="sg_@sg" value="@sg" checked="@(sg == "100%")" />
+                                    <label class="btn btn-sm btn-outline-secondary px-3" style="min-height: 40px; display:inline-flex; align-items:center;" for="sg_@sg">@sg</label>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 4. Mức đá (tự ẩn khi chọn Pha nóng) -->
+                    @if (Model.AllowIce)
+                    {
+                        <div class="mb-3" id="iceLevelSection">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">4. Mức đá viên (hiển thị trực tiếp trên ly 3D)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var ic in new[] { "100%", "70%", "50%", "30%", "0%" })
+                                {
+                                    <input type="radio" class="btn-check opt-ice" name="iceLevel" id="ic_@ic" value="@ic" checked="@(ic == "100%")" />
+                                    <label class="btn btn-sm btn-outline-secondary px-3" style="min-height: 40px; display:inline-flex; align-items:center;" for="ic_@ic">@ic</label>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 5. Topping nhiều lựa chọn -->
+                    @if (Model.Toppings.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">Topping thêm (Tùy chọn)</label>
+                            <div class="row g-2">
+                                @foreach (var top in Model.Toppings)
+                                {
+                                    <div class="col-sm-6">
+                                        <label class="border rounded-3 p-2 px-3 d-flex align-items-center justify-content-between w-100" style="min-height: 46px; cursor: pointer;">
+                                            <span class="d-flex align-items-center gap-2">
+                                                <input type="checkbox" class="form-check-input m-0 opt-topping" name="toppingIds"
+                                                       value="@top.Id" data-price="@top.Price" data-name="@top.Name" />
+                                                <span class="small fw-semibold">@top.Name</span>
+                                            </span>
+                                            <span class="small text-coffee fw-bold">+@FormatHelper.Vnd(top.Price)</span>
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 6. Số lượng & Ghi chú -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-4">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">Số lượng</label>
+                            <div class="input-group">
+                                <button type="button" class="btn btn-outline-secondary" id="btnQtyDec" aria-label="Giảm">-</button>
+                                <input type="number" name="quantity" id="detailQtyInput" value="1" min="1" max="99" class="form-control text-center fw-bold" required />
+                                <button type="button" class="btn btn-outline-secondary" id="btnQtyInc" aria-label="Tăng">+</button>
+                            </div>
+                        </div>
+                        <div class="col-sm-8">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">Ghi chú cho Barista</label>
+                            <input type="text" name="note" maxlength="200" class="form-control" placeholder="Ví dụ: Để đá riêng, ít ngọt hơn..." style="min-height: 44px;" />
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-4 bg-cream d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <span class="small text-muted d-block">Thành tiền dự kiến</span>
+                            <strong class="fs-3 text-coffee" id="liveTotalPrice" data-base-price="@defaultPrice">@FormatHelper.Vnd(defaultPrice)</strong>
+                        </div>
+
+                        @if (Model.IsAvailable)
+                        {
+                            <button type="submit" class="btn btn-coffee btn-lg px-4">
+                                <i class="bi bi-bag-plus-fill me-2"></i> Thêm vào giỏ hàng
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-secondary btn-lg px-4" disabled>
+                                Món đang tạm hết
+                            </button>
+                        }
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gợi ý món cùng danh mục -->
+    @if (Model.RelatedProducts.Count > 0)
+    {
+        <section class="mt-5 pt-3">
+            <h2 class="h4 fw-bold font-display mb-3">Gợi ý món cùng danh mục (@Model.CategoryName)</h2>
+            <div class="row g-4">
+                @foreach (var rel in Model.RelatedProducts)
+                {
+                    <div class="col-sm-6 col-lg-3">
+                        <partial name="_ProductCardPartial" model="rel" />
+                    </div>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initDrinkCustomizer3D } from '/js/three-drink-customizer.js';
+
+        const drink3D = initDrinkCustomizer3D('drink3DStage', {
+            isBakery: @(isBakery.ToString().ToLower()),
+            liquidColor: '@Model.LiquidColorHex',
+            sizeName: '@defaultSize',
+            temperature: 'Lạnh',
+            iceLevel: '100%',
+            toppings: []
+        });
+
+        const fmtVnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + ' ₫';
+        const priceEl = document.getElementById('liveTotalPrice');
+        const qtyEl = document.getElementById('detailQtyInput');
+        const iceSection = document.getElementById('iceLevelSection');
+
+        function recalculateAndSync3D() {
+            const sizeRadio = document.querySelector('.opt-size:checked');
+            const sizePrice = sizeRadio ? parseFloat(sizeRadio.dataset.price) : parseFloat(priceEl.dataset.basePrice);
+            const sizeName = sizeRadio ? sizeRadio.value : 'M';
+
+            const tempRadio = document.querySelector('.opt-temp:checked');
+            const temperature = tempRadio ? tempRadio.value : 'Lạnh';
+
+            if (iceSection) {
+                iceSection.style.display = temperature === 'Nóng' ? 'none' : 'block';
+            }
+
+            const iceRadio = document.querySelector('.opt-ice:checked');
+            const icePercent = temperature === 'Nóng' ? 0 : (parseInt(iceRadio?.value || '100', 10) || 0);
+
+            let topSum = 0;
+            const topNames = [];
+            document.querySelectorAll('.opt-topping:checked').forEach(chk => {
+                topSum += parseFloat(chk.dataset.price || '0');
+                topNames.push(chk.dataset.name || '');
+            });
+
+            const qty = Math.min(99, Math.max(1, parseInt(qtyEl.value || '1', 10)));
+            priceEl.textContent = fmtVnd((sizePrice + topSum) * qty);
+
+            drink3D?.updateCustomization({
+                sizeName,
+                temperature,
+                icePercent,
+                toppings: topNames
+            });
+        }
+
+        document.querySelectorAll('#productCustomizeForm input').forEach(inp => {
+            inp.addEventListener('change', recalculateAndSync3D);
+            inp.addEventListener('input', recalculateAndSync3D);
+        });
+
+        document.getElementById('btnQtyDec')?.addEventListener('click', () => {
+            qtyEl.value = Math.max(1, (parseInt(qtyEl.value, 10) || 1) - 1);
+            recalculateAndSync3D();
+        });
+        document.getElementById('btnQtyInc')?.addEventListener('click', () => {
+            qtyEl.value = Math.min(99, (parseInt(qtyEl.value, 10) || 1) + 1);
+            recalculateAndSync3D();
+        });
+    </script>
+}
+

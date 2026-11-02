@@ -1,0 +1,38 @@
+@model StoreSettingsDto
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Giới thiệu thương hiệu";
+    var tablesJson = JsonSerializer.Serialize(ViewBag.Tables3D ?? new List<Table3DDto>(), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+}
+
+<div class="container py-5">
+    <div class="row align-items-center g-4 mb-5">
+        <div class="col-lg-6">
+            <span class="badge bg-cream text-coffee px-3 py-2 mb-2">Về chúng tôi</span>
+            <h1 class="display-6 fw-bold font-display mb-3">@Model.ShopName – @Model.Slogan</h1>
+            <p class="text-secondary">
+                Ra đời với tâm huyết tôn vinh hạt cà phê Việt Nam nguyên bản và bánh ngọt nướng tươi mỗi sáng, <strong>@Model.ShopName</strong> mang đến không gian thân thiện cho sinh viên, nhân viên văn phòng và những buổi trò chuyện ấm cúng.
+            </p>
+            <ul class="list-unstyled d-grid gap-2 text-secondary">
+                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Nguồn nguyên liệu cà phê Cầu Đất &amp; trà Ô Long Bảo Lộc truy xuất rõ ràng.</li>
+                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Bánh ngọt thủ công nướng mới mỗi ngày không chất bảo quản.</li>
+                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Tiên phong ứng dụng không gian 3D Three.js giúp khách chọn chỗ ngồi yêu thích.</li>
+            </ul>
+            <div class="d-flex gap-2 mt-4">
+                <a href="/menu" class="btn btn-coffee px-4">Xem Thực đơn</a>
+                <a href="/reservation" class="btn btn-outline-coffee px-4">Đặt bàn trước 3D</a>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="three-hero-stage" id="aboutCafe3D" style="height: 390px;"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { initCafeHero3D } from '/js/three-cafe-hero.js';
+        initCafeHero3D('aboutCafe3D', @Html.Raw(tablesJson));
+    </script>
+}
+

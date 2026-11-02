@@ -1,0 +1,182 @@
+@model Order
+@{
+    ViewData["Title"] = $"Đơn hàng {Model.Code}";
+    var store = ViewBag.Store as StoreSettingsDto ?? new StoreSettingsDto();
+    var steps = Model.OrderType == OrderType.Delivery
+        ? new[] { OrderStatus.Pending, OrderStatus.Confirmed, OrderStatus.Brewing, OrderStatus.Ready, OrderStatus.Delivering, OrderStatus.Completed }
+        : new[] { OrderStatus.Pending, OrderStatus.Confirmed, OrderStatus.Brewing, OrderStatus.Ready, OrderStatus.Completed };
+    int currentStepIdx = Array.IndexOf(steps, Model.Status);
+}
+
+<div class="container py-4 py-lg-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <a href="/orders" class="text-decoration-none small text-coffee"><i class="bi bi-arrow-left me-1"></i> Danh sách đơn hàng</a>
+            <h1 class="h3 fw-bold font-display mb-0 mt-1">Đơn hàng @Model.Code</h1>
+        </div>
+        <div id="liveOrderBadgeWrap">
+            <partial name="_StatusBadge" model="Model.Status" />
+        </div>
+    </div>
+
+    <!-- Timeline Tiến trình đơn hàng (Mục 7.1) -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+        @if (Model.Status == OrderStatus.Cancelled)
+        {
+            <div class="alert alert-danger mb-0">
+                <strong><i class="bi bi-x-octagon-fill me-1"></i> Đơn hàng đã hủy</strong>
+                @if (!string.IsNullOrWhiteSpace(Model.CancelReason))
+                {
+                    <div class="small mt-1">Lý do: @Model.CancelReason (@Model.CancelledBy – @(Model.CancelledAt.HasValue ? FormatHelper.DateTimeVn(Model.CancelledAt.Value) : ""))</div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="row g-2 text-center">
+                @for (int i = 0; i < steps.Length; i++)
+                {
+                    var st = steps[i];
+                    bool done = currentStepIdx >= i;
+                    <div class="col">
+                        <div class="p-2 rounded-3 @(done ? "bg-cream border border-warning" : "bg-light text-muted")">
+                            <i class="bi @st.GetStatusIcon() fs-4 d-block mb-1 @(done ? "text-coffee" : "")"></i>
+                            <strong class="small d-block">@st.GetDisplayName()</strong>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+                <h2 class="h5 fw-bold mb-3">Chi tiết món đã đặt</h2>
+                @foreach (var item in Model.Items)
+                {
+                    var opts = new[] { item.SizeName != null ? $"Size {item.SizeName}" : null, item.Temperature, item.SugarLevel != null ? $"Đường {item.SugarLevel}" : null, item.IceLevel != null ? $"Đá {item.IceLevel}" : null }
+                        .Where(x => !string.IsNullOrWhiteSpace(x));
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <div>
+                            <div class="fw-bold">@item.Quantity x @item.ProductName</div>
+                            <div class="small text-muted">@string.Join(" • ", opts)</div>
+                            @if (item.Toppings.Count > 0)
+                            {
+                                <div class="small text-coffee">+ @string.Join(", ", item.Toppings.Select(t => $"{t.ToppingName} ({FormatHelper.Vnd(t.Price)})"))</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.Note))
+                            {
+                                <div class="small fst-italic text-secondary">"@item.Note"</div>
+                            }
+                        </div>
+                        <strong class="text-nowrap ms-3">@FormatHelper.Vnd(item.LineTotal)</strong>
+                    </div>
+                }
+
+                <div class="pt-3 small">
+                    <div class="d-flex justify-content-between mb-1"><span>Tạm tính</span><strong>@FormatHelper.Vnd(Model.Subtotal)</strong></div>
+                    <div class="d-flex justify-content-between mb-1"><span>Giảm giá</span><strong class="text-success">-@FormatHelper.Vnd(Model.DiscountAmount)</strong></div>
+                    <div class="d-flex justify-content-between mb-2"><span>Phí giao hàng</span><strong>@FormatHelper.Vnd(Model.ShippingFee)</strong></div>
+                    <div class="d-flex justify-content-between fs-5 border-top pt-2"><span class="fw-bold">Tổng cộng</span><strong class="text-coffee">@FormatHelper.Vnd(Model.Total)</strong></div>
+                </div>
+            </div>
+
+            <!-- Lịch sử trạng thái -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <h2 class="h6 fw-bold mb-3">Nhật ký cập nhật trạng thái</h2>
+                <ul class="list-unstyled mb-0 small d-grid gap-2">
+                    @foreach (var h in Model.StatusHistories.OrderByDescending(x => x.ChangedAt))
+                    {
+                        <li class="d-flex justify-content-between border-bottom pb-2">
+                            <span>
+                                <strong>@h.ToStatus.GetDisplayName()</strong>
+                                @if (!string.IsNullOrWhiteSpace(h.Note))
+                                {
+                                    <span class="text-muted"> – @h.Note</span>
+                                }
+                            </span>
+                            <span class="text-muted">@FormatHelper.DateTimeVn(h.ChangedAt, "dd/MM/yyyy HH:mm:ss")</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-3">
+                <h2 class="h6 fw-bold mb-3">Thông tin nhận món &amp; Thanh toán</h2>
+                <div class="small d-grid gap-2">
+                    <div><span class="text-muted">Khách hàng:</span> <strong>@Model.CustomerName</strong> (@Model.Phone)</div>
+                    <div><span class="text-muted">Hình thức:</span> <strong>@Model.OrderType.GetDisplayName() @(Model.Table != null ? $"• Bàn {Model.Table.Code}" : "")</strong></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.DeliveryAddress))
+                    {
+                        <div><span class="text-muted">Địa chỉ giao:</span> <strong>@Model.DeliveryAddress</strong></div>
+                    }
+                    <div><span class="text-muted">Thanh toán:</span> <strong>@Model.PaymentMethod – @Model.PaymentStatus.GetDisplayName()</strong></div>
+                </div>
+
+                @if (Model.PaymentMethod == "QR" && Model.PaymentStatus == PaymentStatus.Unpaid && store.IsQrConfigured)
+                {
+                    <hr />
+                    <div class="text-center">
+                        <img src="@store.QrImageUrl" alt="QR" class="img-fluid rounded mb-2" style="max-height: 180px;" />
+                        <div class="small">Nội dung CK: <strong class="badge bg-dark">@Model.Code</strong></div>
+                    </div>
+                }
+
+                <hr />
+                <div class="d-grid gap-2">
+                    <form method="post" action="/orders/@Model.Code/reorder">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-coffee w-100">
+                            <i class="bi bi-arrow-repeat me-1"></i> Đặt lại đơn này
+                        </button>
+                    </form>
+
+                    @if (Model.Status == OrderStatus.Pending)
+                    {
+                        <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#cancelMyOrderModal">
+                            <i class="bi bi-x-circle me-1"></i> Hủy đơn hàng
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Status == OrderStatus.Pending)
+{
+    <div class="modal fade" id="cancelMyOrderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="/orders/@Model.Code/cancel" class="modal-content rounded-4 border-0">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Hủy đơn hàng @Model.Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label small fw-semibold">Lý do hủy đơn (Bắt buộc) *</label>
+                    <textarea name="reason" rows="3" class="form-control" required maxlength="200" placeholder="Ví dụ: Muốn đổi sang món khác..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger">Xác nhận hủy đơn</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        window.DatMocRealtime?.onStatusChanged((payload) => {
+            if (!payload.code || payload.code === '@Model.Code' || payload.polled) {
+                window.DatMocRealtime.showToast('Cập nhật đơn hàng', 'Trạng thái đơn của bạn vừa được cập nhật!', 'primary');
+                setTimeout(() => location.reload(), 900);
+            }
+        });
+    </script>
+}
+
