@@ -16,7 +16,14 @@ public static class DbInitializer
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbInitializer");
         var db = services.GetRequiredService<AppDbContext>();
 
-        await db.Database.MigrateAsync();
+        if (db.Database.IsSqlite())
+        {
+            await db.Database.EnsureCreatedAsync();
+        }
+        else
+        {
+            await db.Database.MigrateAsync();
+        }
 
         // Đảm bảo bộ ảnh SVG cục bộ cho toàn bộ món seed luôn sẵn sàng
         SeedArtworkGenerator.EnsureSeedImages(env.WebRootPath);

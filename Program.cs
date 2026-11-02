@@ -29,12 +29,26 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.Razor.RazorViewEngineOptions
     options.AreaViewLocationFormats.Add("/Frontend/Views/Shared/{0}.cshtml");
 });
 
-// 1. Database (EF Core + SQL Server LocalDB)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Chưa cấu hình chuỗi kết nối 'DefaultConnection'.");
+// 1. Database (EF Core + SQL Server / SQLite auto-detect cho Cloud Container & Render)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+bool isSqlite = string.IsNullOrWhiteSpace(connectionString)
+    || connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase)
+    || (connectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase) && !connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase))
+    || (!OperatingSystem.IsWindows() && (connectionString?.Contains("(localdb)", StringComparison.OrdinalIgnoreCase) ?? true));
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+if (isSqlite)
+{
+    var sqliteConn = (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("(localdb)", StringComparison.OrdinalIgnoreCase))
+        ? "Data Source=coffee.db"
+        : connectionString;
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite(sqliteConn));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(connectionString!));
+}
 
 // 2. ASP.NET Core Identity + Chính sách mật khẩu & Khóa tạm 5 phút sau 5 lần sai (Mục 4.2 & 5.1)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
